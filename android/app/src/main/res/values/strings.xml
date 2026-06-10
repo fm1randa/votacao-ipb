@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Votação — Servidor</string>
+    <string name="iniciar">Iniciar votação</string>
+    <string name="parar">Parar</string>
+    <string name="parado">Servidor parado.</string>
+    <string name="iniciando">Iniciando…</string>
+    <string name="precisa_permissoes">Conceda as permissões para criar a rede Wi-Fi.</string>
+    <string name="permitir_bateria">Permitir em segundo plano (bateria)</string>
+    <string name="bateria_ok">Já liberado da otimização de bateria.</string>
+    <string name="passo1">1. Entre na rede Wi-Fi</string>
+    <string name="passo2">2. Abra o sistema</string>
+    <string name="wifi_info">Rede: %1$s\nSenha: %2$s</string>
+</resources>

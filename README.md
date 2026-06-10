@@ -81,7 +81,13 @@ internal/store/tally_test.go  testes do motor
 internal/web/web.go           servidor, rotas, PIN, termos por âmbito, eleitor/telão
 internal/web/web_board.go     handlers da mesa + relatório
 internal/web/templates/       html/template embutidos
+android/                      app Android "casca fina" (SPIKE) — hospeda o servidor
+                              no celular: LocalOnlyHotspot + 2 QR codes; ver android/README.md
+android/build-go.sh           compila o servidor Go → jniLibs/arm64-v8a/libvotacao.so
 ```
+
+> O repositório é um **monorepo**: o app Android mora em `android/` (projeto
+> Gradle standalone, fora do go.mod).
 
 ## Gotchas operacionais
 - **Nobreak/baterias** no notebook e roteador.

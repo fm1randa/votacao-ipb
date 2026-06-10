@@ -12,3 +12,11 @@ votacao.exe
 # Artefatos locais
 .playwright-mcp/
 .DS_Store
+
+# App Android (android/) — artefatos do Gradle e binário Go empacotado
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/jniLibs/
+*.apk
