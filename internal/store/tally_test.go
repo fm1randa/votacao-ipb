@@ -552,6 +552,57 @@ func TestMudarAmbito_SoAntesDaAbertura(t *testing.T) {
 	must(t, st.UpdateCongress(ctx, cong, AmbitoLocal, "UMP", "UMP Central", 2027))
 }
 
+func TestIndicacao_RestringeCedulaEVoto(t *testing.T) {
+	ctx := context.Background()
+	c := setup(t)
+	// Plenário indica Ana e Bruno — Caio/Davi ficam fora da cédula.
+	round, err := c.st.AbrirCargo(ctx, c.cong, c.pos,
+		[]int64{c.electors["Ana"], c.electors["Bruno"]})
+	must(t, err)
+	votaveis, _ := c.st.VotableElectors(ctx, round.ID)
+	if len(votaveis) != 2 {
+		t.Fatalf("cédula deveria ter só os 2 indicados, veio %d", len(votaveis))
+	}
+	if err := c.st.CastVote(ctx, round.ID, c.tokens["Ana"], "candidato", c.electors["Caio"]); err != ErrInvalidVotee {
+		t.Fatalf("voto em não-indicado deveria ser recusado, veio %v", err)
+	}
+	must(t, c.st.CastVote(ctx, round.ID, c.tokens["Ana"], "candidato", c.electors["Bruno"]))
+	if n, _ := c.st.IndicadosCount(ctx, round.ID); n != 2 {
+		t.Fatalf("IndicadosCount esperado 2, veio %d", n)
+	}
+}
+
+func TestIndicacao_HerdadaNoSegundoEscrutinio(t *testing.T) {
+	ctx := context.Background()
+	c := setup(t)
+	round, err := c.st.AbrirCargo(ctx, c.cong, c.pos,
+		[]int64{c.electors["Ana"], c.electors["Bruno"], c.electors["Caio"]})
+	must(t, err)
+	// 2-1-1 + nada: ninguém faz maioria (3 de 4 depositados... 2<3) → 2º escrutínio.
+	must(t, c.st.CastVote(ctx, round.ID, c.tokens["Ana"], "candidato", c.electors["Ana"]))
+	must(t, c.st.CastVote(ctx, round.ID, c.tokens["Bruno"], "candidato", c.electors["Ana"]))
+	must(t, c.st.CastVote(ctx, round.ID, c.tokens["Caio"], "candidato", c.electors["Bruno"]))
+	must(t, c.st.CastVote(ctx, round.ID, c.tokens["Davi"], "candidato", c.electors["Caio"]))
+	res, err := c.st.EncerrarEscrutinio(ctx, round.ID)
+	must(t, err)
+	if res.Eleito != nil {
+		t.Fatalf("2-1-1 de 4 depositados não deveria eleger (maioria 3): %+v", res.Eleito)
+	}
+	// Art. 91d–e (à risca): o 2º escrutínio herda a indicação do 1º.
+	r2, err := c.st.AbrirProximoEscrutinio(ctx, c.pos)
+	must(t, err)
+	if r2.Numero != 2 || r2.Runoff {
+		t.Fatalf("esperava 2º escrutínio pleno, veio %+v", r2)
+	}
+	votaveis, _ := c.st.VotableElectors(ctx, r2.ID)
+	if len(votaveis) != 3 {
+		t.Fatalf("2º escrutínio deveria herdar os 3 indicados, veio %d votáveis", len(votaveis))
+	}
+	if err := c.st.CastVote(ctx, r2.ID, c.tokens["Ana"], "candidato", c.electors["Davi"]); err != ErrInvalidVotee {
+		t.Fatalf("Davi não foi indicado — voto deveria ser recusado no 2º também, veio %v", err)
+	}
+}
+
 func TestOperationLog_ReiniciarEDesfazer(t *testing.T) {
 	ctx := context.Background()
 	c := setup(t)

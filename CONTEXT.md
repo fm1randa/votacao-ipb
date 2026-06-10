@@ -116,8 +116,10 @@ visível). Não há override — rol incorreto corrige-se editando o rol.
 
 **Indicação**:
 Nome proposto pelo Plenário para um Cargo (opcional). Sem Indicação, qualquer
-Delegado credenciado pode receber Votos. Só prevista nos Âmbitos federados
-(Art. 91d); o Art. 90 não a contempla na Plenária local.
+Delegado credenciado pode receber Votos. A Indicação é do **Cargo**, não de um
+Escrutínio: vale do 1º ao 2º Escrutínio (o 3º estreita aos dois mais votados —
+Art. 91d–e) e não muda depois de aberta a votação (corrige-se desfazendo). Só
+prevista nos Âmbitos federados; o Art. 90 não a contempla na Plenária local.
 _Avoid_: Candidatura, chapa (não há chapas; a unidade é o Cargo).
 
 **Operação**:

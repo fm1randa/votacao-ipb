@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -239,7 +240,11 @@ func (s *Store) AbrirCargo(ctx context.Context, congressID, positionID int64, in
 	if posAtivo == 0 {
 		return Round{}, errors.New("cargo desativado nas configurações")
 	}
-	if err := s.snapshotOp(ctx, "Abriu escrutínio: "+nome); err != nil {
+	desc := "Abriu escrutínio: " + nome
+	if n := len(indicados); n > 0 {
+		desc += fmt.Sprintf(" (%d indicados)", n)
+	}
+	if err := s.snapshotOp(ctx, desc); err != nil {
 		return Round{}, err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -297,6 +302,14 @@ func (s *Store) AbrirProximoEscrutinio(ctx context.Context, positionID int64) (R
 		if err != nil {
 			return Round{}, err
 		}
+	} else {
+		// A Indicação é do CARGO, não do escrutínio (Art. 91d–e, leitura à
+		// risca): o 2º escrutínio herda o conjunto do 1º. Sem indicação no 1º,
+		// devolve vazio e o 2º segue aberto a todos.
+		indicados, err = roundCandidates(ctx, tx, prev.ID)
+		if err != nil {
+			return Round{}, err
+		}
 	}
 	rID, err := criarRound(ctx, tx, positionID, next, runoff, indicados)
 	if err != nil {
@@ -323,6 +336,53 @@ func criarRound(ctx context.Context, tx *sql.Tx, positionID int64, numero int, r
 		}
 	}
 	return rID, nil
+}
+
+// roundCandidates devolve o conjunto restrito (indicação) de um escrutínio.
+func roundCandidates(ctx context.Context, tx *sql.Tx, roundID int64) ([]int64, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT elector_id FROM round_candidate WHERE round_id = ?`, roundID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// IndicadosCount conta o conjunto restrito de um escrutínio (selo da Mesa).
+func (s *Store) IndicadosCount(ctx context.Context, roundID int64) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM round_candidate WHERE round_id = ?`, roundID).Scan(&n)
+	return n, err
+}
+
+// IndicaveisElectors lista quem pode ser INDICADO para um cargo do congresso —
+// os mesmos filtros da cédula aberta (presente, não eleito, idade do âmbito),
+// antes de existir o escrutínio (alimenta o modal de indicação da Mesa).
+func (s *Store) IndicaveisElectors(ctx context.Context, congressID int64) ([]Elector, error) {
+	var ambito, sociedade string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT ambito, sociedade FROM congress WHERE id = ?`, congressID).
+		Scan(&ambito, &sociedade); err != nil {
+		return nil, err
+	}
+	return s.queryElectors(ctx, `
+		SELECT `+electorCols+`
+		FROM elector e`+electorJoins+`
+		WHERE e.presente = 1 AND e.congress_id = ?
+		  AND e.id NOT IN (
+		    SELECT eleito_elector_id FROM position
+		    WHERE congress_id = e.congress_id AND eleito_elector_id IS NOT NULL)`+
+		ageEligibleSQL(ambito, sociedade)+` ORDER BY e.nome`, congressID)
 }
 
 // topNVotees devolve os IDs dos N delegados mais votados de um escrutínio.

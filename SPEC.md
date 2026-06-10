@@ -37,9 +37,16 @@ das Sociedades Internas da IPB (2015)**, Regimento Interno (Art. 25–33) e
   substitutos) + ≥2 representantes por UMP local (nº no edital).
 - **Quem pode ser votado [decisão, confirmada]:** **qualquer delegado
   credenciado.** Não há lista fechada pré-definida.
-- **Indicação (Art. 91d) é OPCIONAL [decisão]:** a mesa *pode* registrar uma
-  short-list de indicados por cargo pra focar a votação, mas no congresso pequeno
-  isso quase nunca ocorre. Sem indicação → cédula lista todos os delegados.
+- **Indicação (Art. 91d) é OPCIONAL [decisão, UI em 2026-06-10]:** a mesa *pode*
+  registrar uma short-list de indicados por cargo, mas no congresso pequeno isso
+  quase nunca ocorre. Sem indicação → cédula lista todos os delegados. UI: o card
+  do cargo tem **dois botões** — "Abrir escrutínio" (direto, caminho comum) e
+  "Com indicações…" (modal com busca sobre os votáveis; mín. 1 nome). Leitura à
+  risca do Art. 91d–e: a indicação é da **eleição do cargo** — o **2º escrutínio
+  herda o conjunto do 1º** (o 3º estreita aos 2 mais votados); imutável após
+  abrir (correção = Desfazer pelo Histórico, que leva os votos junto). Só
+  âmbitos federados (Art. 90 omite). Selo "indicação: N nomes" na Mesa;
+  telão/relatório já exibem o conjunto restrito completo.
 - **Elegibilidade [decisão, revista 2026-06-10]:** o GTSI exige candidato membro
   da IPB +1 ano (Art. 91c) e sócio ativo +1 ano (Art. 25 PU) — **sem verificação
   pelo software** (responsabilidade da Comissão de Diplomacia). Exceção: os

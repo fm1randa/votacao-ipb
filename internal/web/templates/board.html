@@ -19,7 +19,65 @@
 </div>
 {{template "mesabottom" .}}
 {{template "mesatoast" .}}
+
+<!-- Modal de indicação (Art. 91d) — fora da região viva pra sobreviver aos ticks
+     do SSE; o corpo é buscado fresco a cada abertura (lista de indicáveis). -->
+<div class="modal-backdrop" id="m-indicar"><div class="modal wide" id="indicar-body"></div></div>
+
+<script>
+  function closeIndicar(){ document.getElementById('m-indicar').classList.remove('open'); }
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-indicar]');
+    if (btn) {
+      var body = document.getElementById('indicar-body');
+      body.innerHTML = '<p class="mut">Carregando…</p>';
+      document.getElementById('m-indicar').classList.add('open');
+      fetch('/board/cargo/indicar?position_id=' + btn.dataset.indicar)
+        .then(function(r){ return r.text(); })
+        .then(function(html){ body.innerHTML = html; if (window.htmx) htmx.process(body); });
+      return;
+    }
+    if (e.target.closest('[data-close]')) { closeIndicar(); return; }
+    if (e.target.classList.contains('modal-backdrop')) closeIndicar();
+  });
+  // Busca dentro do modal (o fragmento chega por fetch, então o filtro é delegado).
+  document.addEventListener('input', function(e){
+    if (e.target.id !== 'ind-busca') return;
+    var q = e.target.value.toLowerCase();
+    document.querySelectorAll('#indicar-body .ind-row').forEach(function(el){
+      el.style.display = el.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+</script>
 </body></html>{{end}}
+
+{{/* Corpo do modal de indicação — lista fresca dos indicáveis (votáveis). */}}
+{{define "indicarForm"}}
+  <p class="eyebrow">Indicação do Plenário</p>
+  <h2 style="margin-top:0">{{.Position.Nome}}</h2>
+  <p class="mut">Marque os nomes indicados — a cédula fica restrita a eles
+    (Art. 91d) e a indicação vale também para o 2º escrutínio
+    (o 3º é entre os dois mais votados).</p>
+  <form hx-post="/board/cargo/abrir" hx-swap="none"
+        hx-on::after-request="if (event.detail.successful) closeIndicar()">
+    <input type="hidden" name="position_id" value="{{.Position.ID}}">
+    <input type="hidden" name="via" value="indicacao">
+    <input type="search" id="ind-busca" placeholder="buscar nome…" style="margin-bottom:8px">
+    <div style="max-height:300px; overflow:auto">
+      {{range .Electors}}
+        <label class="opt ind-row" data-nome="{{.Nome}} {{.LocalNome}}">
+          <input type="checkbox" name="indicados" value="{{.ID}}"
+                 style="width:22px;height:22px;accent-color:var(--green);flex:none">
+          <span><strong>{{.Nome}}</strong>{{if .LocalNome}}<br><span class="mut">{{.LocalNome}}</span>{{end}}</span>
+        </label>
+      {{else}}
+        <p class="mut">Ninguém apto a ser indicado — confira presença e elegibilidade.</p>
+      {{end}}
+    </div>
+    <button type="submit">Abrir escrutínio com os indicados</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+{{end}}
 
 {{define "boardLive"}}
   {{if .Congresso.Encerrada}}<div class="card" style="border-color:var(--gold)">
@@ -78,7 +136,8 @@
       <h2 style="margin-top:0">{{.Atual.Nome}}</h2>
       {{if .Round}}
         <p class="mut">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}} —
-          {{if eq .Round.Status "aberto"}}<span class="pill on">aberto</span>{{else}}<span class="pill off">encerrado</span>{{end}}</p>
+          {{if eq .Round.Status "aberto"}}<span class="pill on">aberto</span>{{else}}<span class="pill off">encerrado</span>{{end}}
+          {{if .Indicados}}<span class="pill warn">indicação: {{.Indicados}} nomes</span>{{end}}</p>
         {{if .PodeEncerrar}}
           <div class="row" style="margin:6px 0"><span class="mut">votaram</span><strong>{{.Depositados}} / {{.Presentes}}</strong></div>
           <div class="bar"><span style="width:{{pct .Depositados .Presentes}}%"></span></div>
@@ -98,6 +157,9 @@
           <form hx-post="/board/cargo/abrir" hx-swap="none">
             <input type="hidden" name="position_id" value="{{.Atual.ID}}">
             <button>Abrir escrutínio</button></form>
+          {{if ne ambito "local"}}
+            <button type="button" class="ghost" data-indicar="{{.Atual.ID}}">Com indicações…</button>
+          {{end}}
         {{else}}
           <p class="mut">Declare a abertura acima para abrir o escrutínio.</p>
         {{end}}

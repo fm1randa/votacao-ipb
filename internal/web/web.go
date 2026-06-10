@@ -209,6 +209,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /board/reissue", s.auth(s.mut(s.reissue)))
 	mux.HandleFunc("POST /board/presenca", s.auth(s.mut(s.presenca)))
 	mux.HandleFunc("POST /board/abertura", s.auth(s.mut(s.declararAbertura)))
+	mux.HandleFunc("GET /board/cargo/indicar", s.auth(s.indicarForm))
 	mux.HandleFunc("POST /board/cargo/abrir", s.auth(s.mut(s.abrirCargo)))
 	mux.HandleFunc("POST /board/escrutinio/encerrar", s.auth(s.mut(s.encerrar)))
 	mux.HandleFunc("POST /board/escrutinio/proximo", s.auth(s.mut(s.proximo)))

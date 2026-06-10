@@ -50,6 +50,12 @@ func (s *Server) boardData(ctx context.Context) (map[string]any, error) {
 	if atual.Status == "em_eleicao" {
 		if round, err := s.st.CurrentRound(ctx, atual.ID); err == nil {
 			data["Round"] = round
+			// Selo "indicação: N nomes" (só fora do runoff — lá o top-2 é regra).
+			if !round.Runoff {
+				if n, err := s.st.IndicadosCount(ctx, round.ID); err == nil && n > 0 {
+					data["Indicados"] = n
+				}
+			}
 			if round.Status == "aberto" {
 				data["PodeEncerrar"] = true
 				if res, err := s.st.Tally(ctx, round.ID); err == nil {
@@ -355,6 +361,29 @@ func (s *Server) declararAbertura(w http.ResponseWriter, r *http.Request) {
 	s.actionDone(w, r, "/board", "Abertura declarada — quórum verificado.", false)
 }
 
+// indicarForm: corpo do modal de indicação (Art. 91d) — lista fresca dos
+// indicáveis, carregada no clique de "Com indicações…".
+func (s *Server) indicarForm(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	positionID, _ := strconv.ParseInt(r.URL.Query().Get("position_id"), 10, 64)
+	pos, err := s.st.GetPosition(ctx, positionID)
+	if err != nil {
+		http.Error(w, "cargo não encontrado", 400)
+		return
+	}
+	electors, err := s.st.IndicaveisElectors(ctx, cong.ID)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	s.render(w, "indicarForm", map[string]any{"Position": pos, "Electors": electors})
+}
+
 func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cong, err := s.st.FirstCongress(ctx)
@@ -362,12 +391,28 @@ func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	r.ParseForm()
 	positionID, _ := strconv.ParseInt(r.FormValue("position_id"), 10, 64)
-	if _, err := s.st.AbrirCargo(ctx, cong.ID, positionID, nil); err != nil {
+	var indicados []int64
+	for _, v := range r.Form["indicados"] {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			indicados = append(indicados, id)
+		}
+	}
+	// Caminho "Com indicações…" sem ninguém marcado: não abre cédula vazia.
+	if r.FormValue("via") == "indicacao" && len(indicados) == 0 {
+		http.Error(w, "marque ao menos um nome para indicar", 400)
+		return
+	}
+	if _, err := s.st.AbrirCargo(ctx, cong.ID, positionID, indicados); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.actionDone(w, r, "/board", "Escrutínio aberto.", false)
+	toast := "Escrutínio aberto."
+	if n := len(indicados); n > 0 {
+		toast = "Escrutínio aberto com " + strconv.Itoa(n) + " indicados."
+	}
+	s.actionDone(w, r, "/board", toast, false)
 }
 
 func (s *Server) encerrar(w http.ResponseWriter, r *http.Request) {
