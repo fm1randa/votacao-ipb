@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paleta espelhada do app web (base.html, tema claro). -->
+<resources>
+    <color name="paper">#F4F6F2</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="ink">#1E231F</color>
+    <color name="muted">#5F6B62</color>
+    <color name="line">#E1E7DF</color>
+    <color name="green">#0D5131</color>
+    <color name="green_dark">#0A3F26</color>
+    <color name="green_mid">#1F7A4D</color>
+    <color name="gold">#A8801F</color>
+    <color name="ok">#1F7A4D</color>
+    <color name="bad">#C0392B</color>
+</resources>

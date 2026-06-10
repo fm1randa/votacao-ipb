@@ -43,8 +43,13 @@ O app tem dois modos (seletor na tela inicial; a escolha é lembrada):
   `libvotacao.so -addr :8090 -host <ip> -db <filesDir>/votacao.db`,
   faz health-check TCP e publica o estado pra Activity. Logs do Go saem no
   logcat com a tag `votacao-go`.
-- `MainActivity`: permissões de runtime, botão liga/desliga, isenção de
-  otimização de bateria e os dois QR codes (zxing).
+- `MainActivity`: identidade visual do app web (verde IPB sobre branco-quente,
+  logo oficial), header com **bolinha de status** (cinza Parado · âmbar
+  Iniciando · verde No ar · vermelho Erro) e mensagem detalhada quando há algo
+  a dizer; permissões de runtime por modo; botão de bateria que **some** quando
+  a isenção já foi concedida; abas **QR Codes** (os dois QRs, zxing) e **Logs**
+  (servidor Go + eventos do app, ring buffer de 500 linhas em memória,
+  monoespaçado com auto-scroll e botão Copiar — útil pra suporte sem adb).
 
 ## Build
 

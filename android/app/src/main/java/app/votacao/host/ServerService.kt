@@ -41,13 +41,20 @@ class ServerService : Service() {
         const val MODE_HOTSPOT = "hotspot"
         const val MODE_EXISTING = "existing"
 
+        // Estados da bolinha do header: cinza, âmbar, verde, vermelho.
+        const val KIND_OFF = "off"
+        const val KIND_STARTING = "starting"
+        const val KIND_ON = "on"
+        const val KIND_ERROR = "error"
+
         // Último estado conhecido — a Activity lê ao (re)abrir.
         @Volatile
         var lastState: HostState? = null
     }
 
     data class HostState(
-        val status: String,        // mensagem em pt pra UI
+        val kind: String,          // KIND_* (cor da bolinha)
+        val status: String,        // mensagem detalhada em pt (linha abaixo do botão)
         val running: Boolean,      // servidor respondendo na porta
         val ssid: String? = null,
         val password: String? = null,
@@ -58,6 +65,17 @@ class ServerService : Service() {
     private var process: Process? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var stopping = false
+
+    // Logs: logcat + ring buffer da aba "Logs" do app.
+    private fun log(line: String) {
+        Log.i(TAG, line)
+        HostLog.add("app", line)
+    }
+
+    private fun logErr(line: String, e: Throwable? = null) {
+        Log.e(TAG, line, e)
+        HostLog.add("app", "ERRO: $line")
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -72,10 +90,12 @@ class ServerService : Service() {
             // Modo "usar a rede atual": Wi-Fi da igreja ou o hotspot do sistema
             // (este último permite SSID/senha personalizados nas configurações
             // do Android — ex.: "Congresso_9440"). O app não cria nada.
-            publish(HostState("Procurando a rede atual…", running = false))
+            publish(HostState(KIND_STARTING, "Procurando a rede atual…", running = false))
+            log("modo: usar a rede atual")
             thread { bootServer(ssid = null, pass = null, preferHotspotIface = false) }
         } else {
-            publish(HostState("Criando a rede Wi-Fi…", running = false))
+            publish(HostState(KIND_STARTING, "Criando a rede Wi-Fi…", running = false))
+            log("modo: criar hotspot")
             startHotspot()
         }
         return START_NOT_STICKY
@@ -92,8 +112,8 @@ class ServerService : Service() {
                 override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
                     hotspot = reservation
                     val (ssid, pass) = credentials(reservation)
-                    Log.i(TAG, "hotspot no ar: ssid=$ssid")
-                    publish(HostState("Rede criada. Localizando o IP…", false, ssid, pass))
+                    log("hotspot no ar: ssid=$ssid")
+                    publish(HostState(KIND_STARTING, "Rede criada. Localizando o IP…", false, ssid, pass))
                     thread { bootServer(ssid, pass, preferHotspotIface = true) }
                 }
 
@@ -105,23 +125,23 @@ class ServerService : Service() {
                         ERROR_TETHERING_DISALLOWED -> "tethering bloqueado no aparelho"
                         else -> "erro $reason"
                     }
-                    Log.e(TAG, "hotspot falhou: $why")
-                    publish(HostState("Falha ao criar a rede: $why. " +
+                    logErr("hotspot falhou: $why")
+                    publish(HostState(KIND_ERROR, "Falha ao criar a rede: $why. " +
                         "Confira se a Localização está LIGADA e o hotspot comum desligado.", false))
                     stopSelf()
                 }
 
                 override fun onStopped() {
-                    Log.w(TAG, "hotspot parado pelo sistema")
+                    logErr("hotspot parado pelo sistema")
                     if (!stopping) {
-                        publish(HostState("O sistema encerrou a rede Wi-Fi.", false))
+                        publish(HostState(KIND_ERROR, "O sistema encerrou a rede Wi-Fi.", false))
                         stopSelf()
                     }
                 }
             }, Handler(Looper.getMainLooper()))
         } catch (e: Exception) { // SecurityException (permissão/Localização) etc.
-            Log.e(TAG, "startLocalOnlyHotspot", e)
-            publish(HostState("Não consegui criar a rede: ${e.message}. " +
+            logErr("startLocalOnlyHotspot: ${e.message}", e)
+            publish(HostState(KIND_ERROR, "Não consegui criar a rede: ${e.message}. " +
                 "Conceda as permissões e ligue a Localização.", false))
             stopSelf()
         }
@@ -161,7 +181,7 @@ class ServerService : Service() {
                 apIface ?: candidates.firstOrNull()
             }
             if (pick != null) {
-                Log.i(TAG, "iface escolhida: ${pick.first} -> ${pick.second.hostAddress}")
+                log("iface escolhida: ${pick.first} -> ${pick.second.hostAddress}")
                 return pick.second.hostAddress
             }
             Thread.sleep(500)
@@ -180,12 +200,13 @@ class ServerService : Service() {
                 "Rede criada, mas não achei o IP da interface."
             else
                 "Sem rede: conecte o celular a um Wi-Fi (ou ligue o hotspot do sistema) e tente de novo."
-            publish(HostState(msg, false, ssid, pass))
+            logErr(msg)
+            publish(HostState(KIND_ERROR, msg, false, ssid, pass))
             return
         }
         val exe = File(applicationInfo.nativeLibraryDir, "libvotacao.so")
         if (!exe.exists()) {
-            publish(HostState("Binário do servidor não está no APK — rode android/build-go.sh antes do build.", false, ssid, pass))
+            publish(HostState(KIND_ERROR, "Binário do servidor não está no APK — rode android/build-go.sh antes do build.", false, ssid, pass))
             return
         }
         val db = File(filesDir, "votacao.db")
@@ -194,8 +215,8 @@ class ServerService : Service() {
                 exe.absolutePath, "-addr", ":$PORT", "-host", ip, "-db", db.absolutePath,
             ).redirectErrorStream(true).start()
         } catch (e: Exception) {
-            Log.e(TAG, "exec falhou", e)
-            publish(HostState("Falha ao executar o servidor: ${e.message}", false, ssid, pass))
+            logErr("exec falhou: ${e.message}", e)
+            publish(HostState(KIND_ERROR, "Falha ao executar o servidor: ${e.message}", false, ssid, pass))
             return
         }
         // Logs do Go vão pro logcat com a tag votacao-go. Tudo em runCatching:
@@ -203,24 +224,27 @@ class ServerService : Service() {
         // destroy() do Parar fecha o stream no meio da leitura (IOException).
         thread {
             runCatching {
-                process?.inputStream?.bufferedReader()?.forEachLine { Log.i(GO_TAG, it) }
+                process?.inputStream?.bufferedReader()?.forEachLine {
+                    Log.i(GO_TAG, it)
+                    HostLog.add("go", it)
+                }
             }
             val code = runCatching { process?.waitFor() }.getOrNull()
-            Log.w(TAG, "servidor terminou (exit=$code)")
-            if (!stopping) publish(HostState("O servidor encerrou inesperadamente (exit=$code).", false, ssid, pass))
+            log("servidor terminou (exit=$code)")
+            if (!stopping) publish(HostState(KIND_ERROR, "O servidor encerrou inesperadamente (exit=$code).", false, ssid, pass))
         }
 
         val url = "http://$ip:$PORT/"
         if (waitHealthy()) {
-            Log.i(TAG, "servidor saudável em $url")
+            log("servidor saudável em $url")
             val msg = if (ssid != null)
                 "Servidor no ar. Aponte a câmera para os QR codes."
             else
                 "Servidor no ar na rede atual. Conecte os aparelhos à MESMA rede e aponte para o QR."
-            publish(HostState(msg, true, ssid, pass, url))
+            publish(HostState(KIND_ON, msg, true, ssid, pass, url))
             updateNotification("Servindo em $url")
         } else {
-            publish(HostState("O servidor não respondeu na porta $PORT.", false, ssid, pass, url))
+            publish(HostState(KIND_ERROR, "O servidor não respondeu na porta $PORT.", false, ssid, pass, url))
         }
     }
 
@@ -277,7 +301,8 @@ class ServerService : Service() {
         runCatching { process?.destroy() }
         runCatching { hotspot?.close() }
         runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
-        publish(HostState("Servidor parado.", false))
+        log("servidor parado pela Mesa")
+        publish(HostState(KIND_OFF, "Servidor parado.", false))
         super.onDestroy()
     }
 }

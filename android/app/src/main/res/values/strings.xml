@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Votação — Servidor</string>
+    <string name="titulo">Servidor de votação</string>
     <string name="iniciar">Iniciar votação</string>
     <string name="parar">Parar</string>
-    <string name="parado">Servidor parado.</string>
-    <string name="iniciando">Iniciando…</string>
+    <string name="st_parado">Parado</string>
+    <string name="st_iniciando">Iniciando…</string>
+    <string name="st_no_ar">No ar</string>
+    <string name="st_erro">Erro</string>
     <string name="precisa_permissoes">Conceda as permissões para criar a rede Wi-Fi.</string>
     <string name="permitir_bateria">Permitir em segundo plano (bateria)</string>
-    <string name="bateria_ok">Já liberado da otimização de bateria.</string>
     <string name="passo1">1. Entre na rede Wi-Fi</string>
     <string name="passo2">2. Abra o sistema</string>
     <string name="wifi_info">SSID: %1$s\nSenha: %2$s</string>
     <string name="modo_hotspot">Criar rede Wi-Fi (hotspot automático)</string>
     <string name="modo_existente">Usar a rede atual (Wi-Fi do local ou hotspot do sistema)</string>
+    <string name="aba_qr">QR Codes</string>
+    <string name="aba_logs">Logs</string>
+    <string name="copiar_logs">Copiar logs</string>
+    <string name="logs_copiados">Logs copiados.</string>
+    <string name="logs_vazios">Nenhum log ainda — inicie a votação.</string>
 </resources>
