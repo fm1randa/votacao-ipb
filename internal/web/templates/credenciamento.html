@@ -1,0 +1,197 @@
+{{define "credenciamento.html"}}<!doctype html><html lang="pt-br"><head><title>Credenciamento — Mesa</title>{{template "styles"}}{{template "htmxjs"}}
+<style>
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 4px; }
+  .chip { padding:7px 14px; border-radius:999px; border:1.5px solid var(--line); background:var(--surface);
+    color:var(--muted); font-weight:600; font-size:.85rem; cursor:pointer; width:auto; margin:0;
+    transition:border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+  .chip.active { border-color:var(--green); color:var(--green); background:color-mix(in srgb,var(--green) 8%,var(--surface)); }
+  /* hover próprio: sem isto os chips herdam o hover de button (fundo verde-escuro)
+     mantendo o texto cinza — contraste ilegível */
+  @media (hover:hover) and (pointer:fine) {
+    .chip:hover { background:color-mix(in srgb,var(--green) 10%,var(--surface)); color:var(--green); border-color:var(--green); }
+    .chip.active:hover { background:color-mix(in srgb,var(--green) 14%,var(--surface)); color:var(--green); }
+  }
+  .cred-row { display:flex; justify-content:space-between; align-items:center; gap:10px;
+    border-top:1px solid var(--line); padding:12px 2px; }
+  .cred-row .who { cursor:pointer; }
+  #vazio { display:none; color:var(--muted); padding:18px 2px; }
+  textarea { width:100%; font-family:var(--sans); font-size:1rem; padding:12px; border-radius:12px;
+    border:1.5px solid var(--line); background:var(--surface); color:var(--ink); }
+</style></head>
+<body>
+<div class="shell">
+  {{template "mesanav" .}}
+  <main class="content"><div class="wrap has-bottomnav">
+    <p class="eyebrow">{{.Congresso.Federacao}}</p>
+    <h1>Credenciamento</h1>
+
+    <div class="card">
+      <div id="cred-counts">{{template "credCounts" .Quorum}}</div>
+      <div class="row" style="gap:8px">
+        <button class="sm" data-modal="m-add" type="button" style="flex:1">+ Adicionar</button>
+        <button class="ghost sm" data-modal="m-import" type="button" style="flex:1">Colar lista</button>
+        <button class="ghost sm" hx-post="/board/reissue" hx-target="#token-body" hx-swap="innerHTML" style="flex:1">Reemitir token</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <input type="search" id="busca" placeholder="buscar por nome ou igreja…">
+      <div class="chips">
+        <button class="chip active" data-f="todos" type="button">Todos</button>
+        <button class="chip" data-f="pendente" type="button">Pendentes</button>
+        <button class="chip" data-f="presente" type="button">Presentes</button>
+        <button class="chip" data-f="ausente" type="button">Ausentes</button>
+      </div>
+      <div id="lista-wrap">{{template "credLista" .}}</div>
+    </div>
+  </div></main>
+</div>
+{{template "mesabottom" .}}
+{{template "mesatoast" .}}
+
+<div class="modal-backdrop" id="m-token"><div class="modal" id="token-body"></div></div>
+
+<div class="modal-backdrop" id="m-add"><div class="modal">
+  <h2>Adicionar delegado</h2>
+  <form hx-post="/board/delegados/add" hx-target="#lista-wrap" hx-swap="innerHTML">
+    <label class="mut" for="a-nome">Nome</label>
+    <input type="text" id="a-nome" name="nome" required>
+    <label class="mut" for="a-igreja" style="display:block; margin-top:10px">UMP local (igreja)</label>
+    <input type="text" id="a-igreja" name="igreja" list="igrejas" placeholder="criada automaticamente se nova">
+    <label class="mut" for="a-nasc" style="display:block; margin-top:10px">Nascimento (opcional — desempate por idade)</label>
+    <input type="text" id="a-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric">
+    <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+      <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem igreja)</label>
+    <button type="submit">Adicionar</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+</div></div>
+
+<div class="modal-backdrop" id="m-import"><div class="modal">
+  <h2>Colar lista de delegados</h2>
+  <form hx-post="/board/delegados/import" hx-target="#lista-wrap" hx-swap="innerHTML">
+    <p class="mut">Um por linha: <code>Nome; Igreja</code></p>
+    <textarea name="lista" rows="8" placeholder="Maria Silva; IP Central&#10;João Souza; IP do Jardim"></textarea>
+    <button type="submit">Importar</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+</div></div>
+
+<div class="modal-backdrop" id="m-edit"><div class="modal">
+  <h2>Editar delegado</h2>
+  <form hx-post="/board/delegados/update" hx-target="#lista-wrap" hx-swap="innerHTML">
+    <input type="hidden" name="elector_id" id="e-id">
+    <label class="mut" for="e-nome">Nome</label>
+    <input type="text" id="e-nome" name="nome" required>
+    <label class="mut" for="e-igreja" style="display:block; margin-top:10px">UMP local (igreja)</label>
+    <input type="text" id="e-igreja" name="igreja" list="igrejas">
+    <label class="mut" for="e-nasc" style="display:block; margin-top:10px">Nascimento (opcional)</label>
+    <input type="text" id="e-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric">
+    <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+      <input type="checkbox" name="nato" value="1" id="e-nato" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem igreja)</label>
+    <button type="submit">Salvar</button>
+    <button type="button" class="danger" id="e-del"
+      hx-post="/board/delegados/delete" hx-target="#lista-wrap" hx-swap="innerHTML"
+      hx-include="closest form" hx-confirm="Remover este delegado do rol?">Remover</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+</div></div>
+
+<datalist id="igrejas">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
+
+<script>
+  var busca=document.getElementById('busca'), chips=Array.from(document.querySelectorAll('.chip')), filtro='todos';
+  function apply(){
+    var q=(busca.value||'').toLowerCase(), n=0, vazio=document.getElementById('vazio');
+    document.querySelectorAll('.cred-row').forEach(function(r){
+      var okQ = r.dataset.nome.toLowerCase().includes(q) || r.dataset.igreja.toLowerCase().includes(q);
+      var okF = filtro==='todos' || r.dataset.status===filtro;
+      var show = okQ && okF; r.style.display = show?'':'none'; if(show) n++;
+    });
+    if (vazio) vazio.style.display = n?'none':'block';
+  }
+  busca.addEventListener('input', apply);
+  chips.forEach(function(c){ c.addEventListener('click', function(){
+    filtro=c.dataset.f; chips.forEach(function(x){ x.classList.toggle('active', x===c); }); apply(); });});
+  document.body.addEventListener('htmx:afterSwap', apply);
+  document.body.addEventListener('openToken', function(){ document.getElementById('m-token').classList.add('open'); });
+  // fechar = esconder + limpar os forms (modal volta sempre zerado)
+  function closeModal(b){ b.classList.remove('open'); b.querySelectorAll('form').forEach(function(f){ f.reset(); }); }
+  document.body.addEventListener('closeModals', function(){
+    document.querySelectorAll('.modal-backdrop.open').forEach(closeModal); });
+  document.addEventListener('click', function(e){
+    var open = e.target.closest('[data-modal]');
+    if (open) { document.getElementById(open.dataset.modal).classList.add('open'); return; }
+    if (e.target.closest('[data-close]')) { closeModal(e.target.closest('.modal-backdrop')); return; }
+    var who = e.target.closest('.cred-row .who');
+    if (who) {
+      var r = who.closest('.cred-row');
+      document.getElementById('e-id').value = r.dataset.id;
+      document.getElementById('e-nome').value = r.dataset.nome;
+      document.getElementById('e-igreja').value = r.dataset.nato==='1' ? '' : r.dataset.igreja;
+      document.getElementById('e-nasc').value = r.dataset.nasc || '';
+      document.getElementById('e-nato').checked = r.dataset.nato==='1';
+      document.getElementById('e-del').style.display = r.dataset.status==='pendente' ? '' : 'none';
+      document.getElementById('m-edit').classList.add('open');
+      return;
+    }
+    if (e.target.classList.contains('modal-backdrop')) closeModal(e.target);
+  });
+</script>
+</body></html>{{end}}
+
+{{define "credCounts"}}
+  <div class="row">
+    <div><span class="num">{{.Presentes}}</span> <span class="mut">presentes</span></div>
+    <div class="mut">credenciados {{.Credenciados}} · locais {{.LocaisRepresentadas}}/{{.LocaisTotal}}
+      {{if gt .Reemissoes 0}}· reemissões {{.Reemissoes}}{{end}}</div>
+  </div>
+{{end}}
+
+{{define "credLista"}}
+  <div id="lista">
+    {{range .Electors}}{{template "credRow" (dict "E" . "OOB" false)}}{{end}}
+    <div id="vazio">Nenhum delegado encontrado.</div>
+  </div>
+{{end}}
+
+{{define "tokenPanel"}}
+  <p class="eyebrow">Credencial</p>
+  <h2 style="margin-top:0">Entregue o código ao delegado</h2>
+  <p class="big" style="text-align:center; letter-spacing:.14em">{{.}}</p>
+  <p class="mut">Não anote a quem foi entregue — o sigilo depende disso.</p>
+  <button type="button" class="btn" data-close>Fechar</button>
+{{end}}
+
+{{/* resposta do credenciar/reemitir: token no modal + linha e contadores via OOB */}}
+{{define "credResult"}}
+  {{template "tokenPanel" .Token}}
+  {{if .Row}}{{template "credRow" (dict "E" .Row "OOB" true)}}{{end}}
+  <div id="cred-counts" hx-swap-oob="innerHTML">{{template "credCounts" .Quorum}}</div>
+{{end}}
+
+{{/* resposta htmx das mutações: lista + contadores e datalist via OOB */}}
+{{define "credListaOOB"}}
+  {{template "credLista" .}}
+  <div id="cred-counts" hx-swap-oob="innerHTML">{{template "credCounts" .Quorum}}</div>
+  <datalist id="igrejas" hx-swap-oob="outerHTML">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
+{{end}}
+
+{{define "credRow"}}
+<div class="cred-row" id="cred-{{.E.ID}}" data-id="{{.E.ID}}" data-nome="{{.E.Nome}}"
+     data-igreja="{{if .E.Nato}}nato{{else}}{{.E.LocalNome}}{{end}}" data-status="{{credStatus .E}}"
+     data-nato="{{if .E.Nato}}1{{else}}0{{end}}" data-nasc="{{if .E.Nascimento.Valid}}{{.E.Nascimento.String}}{{end}}"{{if .OOB}} hx-swap-oob="outerHTML"{{end}}>
+  <div class="who" title="Editar"><strong>{{.E.Nome}}</strong><br><span class="mut">{{if .E.Nato}}nato{{else}}{{.E.LocalNome}}{{end}}</span></div>
+  <div style="text-align:right; flex:none">
+    {{if not .E.Credenciado}}
+      <button class="sm" hx-post="/board/credenciar" hx-vals='{"elector_id": {{.E.ID}}}' hx-target="#token-body" hx-swap="innerHTML">Credenciar</button>
+    {{else if .E.Presente}}
+      <span class="pill on">presente</span>
+      <button class="ghost sm" hx-post="/board/presenca" hx-vals='{"elector_id": {{.E.ID}}, "presente": 0}' hx-target="#cred-{{.E.ID}}" hx-swap="outerHTML">saída</button>
+    {{else}}
+      <span class="pill off">ausente</span>
+      <button class="ghost sm" hx-post="/board/presenca" hx-vals='{"elector_id": {{.E.ID}}, "presente": 1}' hx-target="#cred-{{.E.ID}}" hx-swap="outerHTML">reentrada</button>
+    {{end}}
+  </div>
+</div>
+{{end}}

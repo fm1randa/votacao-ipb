@@ -1,0 +1,19 @@
+{{define "setup.html"}}<!doctype html><html lang="pt-br"><head><title>Definir PIN da Mesa</title>{{template "styles"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
+  <p class="eyebrow">Primeira configuração · passo 1 de 3</p>
+  <h1>Defina o PIN da Mesa</h1>
+  <p class="mut">Defina o <strong>PIN da Mesa</strong>. Ele protege a área de operação
+    e será pedido a quem for operar o sistema. Anote e combine com a mesa.</p>
+  {{if .Erro}}<div class="erro">Os PINs não conferem ou têm menos de 4 dígitos.</div>{{end}}
+  <form method="post" action="/board/setup">
+    <div class="card">
+      <label class="mut" for="pin">PIN da Mesa (mín. 4 dígitos)</label>
+      <input type="password" id="pin" name="pin" inputmode="numeric" autocomplete="off" required autofocus>
+      <label class="mut" for="confirm" style="margin-top:10px;display:block">Confirme o PIN</label>
+      <input type="password" id="confirm" name="confirm" inputmode="numeric" autocomplete="off" required>
+    </div>
+    <button type="submit">Definir e entrar</button>
+    <a class="ghost btn" href="/">Voltar</a>
+  </form>
+</div></body></html>{{end}}

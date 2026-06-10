@@ -1,0 +1,65 @@
+{{define "vote.html"}}<!doctype html><html lang="pt-br"><head><title>Votar — {{.Cargo}}</title>{{template "styles"}}</head>
+<body><div class="wrap">
+  <div class="row" style="margin-bottom:10px">
+    <a href="/delegado" class="mut" style="text-decoration:none; font-weight:700">‹ Voltar</a>
+    <img src="/assets/img/logo_ipb.png" alt="IPB" style="height:34px">
+  </div>
+  <p class="eyebrow">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}}</p>
+  <h1>{{.Cargo}}</h1>
+  {{if .Erro}}<div class="erro">{{.Erro}}</div>{{end}}
+
+  <form method="post" action="/vote" id="f">
+    <input type="hidden" name="round_id" value="{{.Round.ID}}">
+
+    <!-- Passo 1: escolha -->
+    <div id="step1">
+      <div class="card">
+        <h2>Escolha</h2>
+        <input type="search" id="busca" placeholder="buscar nome…" style="margin-bottom:10px">
+        <div id="lista">
+          {{range .Candidatos}}
+            <label class="opt cand" data-nome="{{.Nome}} {{.LocalNome}}"
+                   data-label="{{.Nome}}{{if .LocalNome}} — {{.LocalNome}}{{end}}">
+              <input type="radio" name="choice" value="{{.ID}}">
+              <span><strong>{{.Nome}}</strong>{{if .LocalNome}}<br><span class="mut">{{.LocalNome}}</span>{{end}}</span></label>
+          {{end}}
+        </div>
+        <label class="opt" data-label="Voto em branco"><input type="radio" name="choice" value="branco"><span>Voto em branco</span></label>
+        <label class="opt" data-label="Anular voto"><input type="radio" name="choice" value="nulo"><span>Anular voto</span></label>
+      </div>
+      <div class="erro" id="msg" style="display:none"></div>
+      <button type="button" id="revisar">Votar</button>
+    </div>
+
+    <!-- Passo 2: confirmação (voto é irreversível) -->
+    <div id="step2" style="display:none">
+      <div class="card" style="text-align:center">
+        <p class="eyebrow">Confira antes de confirmar</p>
+        <p class="mut" style="margin:.2em 0">Você está votando em</p>
+        <p class="big" id="reviewLabel" style="margin:.1em 0"></p>
+      </div>
+      <button type="submit">Confirmar voto</button>
+      <button type="button" class="ghost" id="voltar">Voltar e mudar</button>
+    </div>
+  </form>
+
+  <script>
+    document.getElementById('busca').addEventListener('input', function(e){
+      var q = e.target.value.toLowerCase();
+      document.querySelectorAll('#lista .cand').forEach(function(el){
+        el.style.display = el.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+    var step1=document.getElementById('step1'), step2=document.getElementById('step2'), msg=document.getElementById('msg');
+    document.getElementById('revisar').addEventListener('click', function(){
+      var c = document.querySelector('input[name=choice]:checked');
+      if (!c) { msg.textContent='Selecione um nome, branco ou nulo.'; msg.style.display='block'; return; }
+      msg.style.display='none';
+      document.getElementById('reviewLabel').textContent = c.closest('.opt').dataset.label;
+      step1.style.display='none'; step2.style.display='block'; window.scrollTo(0,0);
+    });
+    document.getElementById('voltar').addEventListener('click', function(){
+      step2.style.display='none'; step1.style.display='block';
+    });
+  </script>
+</div></body></html>{{end}}

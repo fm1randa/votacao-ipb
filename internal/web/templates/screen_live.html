@@ -1,0 +1,26 @@
+{{define "screen_live.html"}}<!doctype html><html lang="pt-br"><head><title>Telão — {{.Congresso.Federacao}}</title>
+{{template "styles"}}{{template "htmxjs"}}{{template "telaostyles"}}</head>
+<body class="dark">
+  <div hx-ext="sse" sse-connect="/events">
+    <div class="wrap t-wrap">
+      <!-- Região viva: sempre o escrutínio mais recente (troca sozinha quando a
+           mesa abre o próximo). Sem escrutínio, mostra a espera com o QR. -->
+      <div id="telao-live" hx-get="/screen/fragment" hx-trigger="load, sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
+        <p class="mut" style="text-align:center; padding:40px 0">Carregando…</p>
+      </div>
+      <div class="card" style="display:flex; align-items:center; justify-content:center; gap:18px">
+        <img src="/qr.png" alt="QR code de acesso" style="width:108px; border-radius:10px; flex:none">
+        <div><strong>Vote pelo celular</strong><br><span class="mut">{{baseURL}}</span></div>
+      </div>
+    </div>
+  </div>
+</body></html>{{end}}
+
+{{define "telaoAguarde"}}
+  <div class="brand brand--screen"><img src="/assets/img/logo_ipb3.png" alt="Igreja Presbiteriana do Brasil"></div>
+  <div class="card" style="text-align:center">
+    <p class="eyebrow" style="color:var(--gold)">{{.Congresso.Federacao}}</p>
+    <h1>Congresso {{.Congresso.Ano}}</h1>
+    <p class="mut">O telão será exibido quando a mesa abrir o primeiro escrutínio.</p>
+  </div>
+{{end}}

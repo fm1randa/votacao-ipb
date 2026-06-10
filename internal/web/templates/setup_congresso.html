@@ -1,0 +1,29 @@
+{{define "setup_congresso.html"}}<!doctype html><html lang="pt-br"><head><title>Configurar congresso</title>{{template "styles"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
+  <p class="eyebrow">Primeira configuração · passo 2 de 3</p>
+  <h1>Dados do congresso</h1>
+  <p class="mut">Os 6 cargos da Diretoria (GTSI, Art. 26a) e a pilha de códigos de
+    votação são criados automaticamente.</p>
+  <form method="post" action="/board/setup/congresso">
+    <div class="card">
+      <label class="mut" for="federacao">Nome da federação</label>
+      <input type="text" id="federacao" name="federacao" required autofocus
+             placeholder="ex.: Federação UMP do Presbitério X">
+      <label class="mut" for="ano" style="display:block; margin-top:12px">Ano do congresso</label>
+      <input type="text" id="ano" name="ano" inputmode="numeric" required value="{{.AnoDefault}}">
+    </div>
+    <div class="card">
+      <h2>Cargos da diretoria</h2>
+      <p class="mut">Federações menores podem acumular cargos (GTSI, Art. 13). Desmarque
+        os que não serão eleitos — Presidente, Secretário e Tesoureiro são obrigatórios.</p>
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px">
+        <input type="checkbox" name="cargo2" value="1" checked style="width:20px;height:20px;accent-color:var(--green)"> Vice-presidente</label>
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px">
+        <input type="checkbox" name="cargo3" value="1" checked style="width:20px;height:20px;accent-color:var(--green)"> Secretário Executivo</label>
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px">
+        <input type="checkbox" name="cargo5" value="1" checked style="width:20px;height:20px;accent-color:var(--green)"> 2º Secretário <span style="opacity:.7">(sem ele, o 1º vira só "Secretário")</span></label>
+    </div>
+    <button type="submit">Continuar</button>
+  </form>
+</div></body></html>{{end}}

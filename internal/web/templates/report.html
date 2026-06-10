@@ -1,0 +1,48 @@
+{{define "report.html"}}<!doctype html><html lang="pt-br"><head><title>Relatório da eleição</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family:"Roboto"; src:url(/assets/fonts/roboto-400.woff2) format("woff2"); font-weight:400; }
+  @font-face { font-family:"Roboto"; src:url(/assets/fonts/roboto-700.woff2) format("woff2"); font-weight:700; }
+  body { font-family:"Roboto",system-ui,sans-serif; font-size:14px; line-height:1.5; color:#1c211d; background:#fff; max-width:720px; margin:0 auto; padding:24px; }
+  .brand img { height:64px; }
+  h1,h2,h3 { font-weight:700; color:#0d5131; }
+  h1 { font-size:1.5rem; } h2 { font-size:1.15rem; margin-top:1.4em; border-bottom:1px solid #ddd; padding-bottom:.2em; }
+  h3 { font-size:1.02rem; margin:.8em 0 .2em; color:#1c211d; }
+  .ok { color:#0d5131; }
+  table { width:100%; border-collapse:collapse; margin:.3em 0; } td,th { padding:4px 6px; text-align:left; border-bottom:1px solid #eee; }
+  .mut { color:#666; } .ok { color:#137333; font-weight:700; }
+  .no-print { margin-bottom:16px; } button { padding:10px 16px; font-size:1rem; cursor:pointer; }
+  @media print { .no-print { display:none; } body { padding:0; } }
+</style></head>
+<body>
+  <div class="no-print"><button onclick="window.print()">Imprimir / salvar PDF</button>
+    <a href="/board" style="margin-left:12px">voltar</a></div>
+
+  <div class="brand"><img src="/assets/img/logo_ipb.png" alt="Igreja Presbiteriana do Brasil"></div>
+  <h1>Relatório da eleição — {{.Congresso.Federacao}} ({{.Congresso.Ano}})</h1>
+
+  <h2>Verificação de Poderes</h2>
+  <table>
+    <tr><td>Delegados credenciados</td><td>{{.Quorum.Credenciados}}</td></tr>
+    <tr><td>Presentes</td><td>{{.Quorum.Presentes}}</td></tr>
+    <tr><td>UMPs locais representadas</td><td>{{.Quorum.LocaisRepresentadas}} de {{.Quorum.LocaisTotal}}{{if .Quorum.LocaisOk}} (há quórum){{else}} (sem quórum){{end}}</td></tr>
+    <tr><td>Tokens entregues</td><td>{{.Quorum.TokensEntregues}}{{if gt .Quorum.Reemissoes 0}} (reemissões: {{.Quorum.Reemissoes}}){{end}}</td></tr>
+  </table>
+
+  <h2>Resultado por cargo</h2>
+  {{range .Cargos}}
+    <h3>{{.Position.Nome}}
+      {{if eq .Position.Status "decidido"}}— <span class="ok">eleito: {{.Position.EleitoNome}}</span>
+      {{else}}— <span class="mut">{{.Position.Status}}</span>{{end}}</h3>
+    {{range .Results}}
+      <div class="mut">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} (2º turno){{end}} —
+        depositados {{.Depositados}}/{{.Presentes}} presentes · brancos {{.Brancos}} · nulos {{.Nulos}} ·
+        abstenções {{.Abstencoes}} · maioria {{.Maioria}}</div>
+      <table>
+        {{range .Lines}}<tr><td>{{.Nome}}{{if .LocalNome}} <span class="mut">· {{.LocalNome}}</span>{{end}}</td>
+          <td style="text-align:right">{{.Votos}}{{if .Eleito}} <span class="ok">✓</span>{{end}}</td></tr>
+        {{else}}<tr><td class="mut">sem votos em candidatos</td><td></td></tr>{{end}}
+      </table>
+    {{else}}<p class="mut">Sem escrutínios.</p>{{end}}
+  {{end}}
+</body></html>{{end}}

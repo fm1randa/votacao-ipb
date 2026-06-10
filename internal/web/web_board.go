@@ -1,0 +1,431 @@
+package web
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+
+	"votacao-ipb/internal/store"
+)
+
+// boardData monta o estado da aba "Escrutínio" (sem o Toast, que é por-requisição).
+func (s *Server) boardData(ctx context.Context) (map[string]any, error) {
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		return nil, err
+	}
+	q, err := s.st.Quorum(ctx, cong.ID)
+	if err != nil {
+		return nil, err
+	}
+	positions, err := s.st.Positions(ctx, cong.ID)
+	if err != nil {
+		return nil, err
+	}
+	decididos := 0
+	for _, p := range positions {
+		if p.Status == "decidido" {
+			decididos++
+		}
+	}
+	data := map[string]any{
+		"Active": "escrutinio", "Congresso": cong, "Quorum": q,
+		"Positions": positions, "Decididos": decididos, "Total": len(positions),
+	}
+	atual, ok, err := s.st.CurrentPosition(ctx, cong.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		data["Concluido"] = true
+		return data, nil
+	}
+	data["Atual"] = atual
+	for i, p := range positions {
+		if p.ID == atual.ID {
+			data["AtualIdx"] = i + 1 // posição na lista ATIVA (seqs podem pular)
+			break
+		}
+	}
+	if atual.Status == "em_eleicao" {
+		if round, err := s.st.CurrentRound(ctx, atual.ID); err == nil {
+			data["Round"] = round
+			if round.Status == "aberto" {
+				data["PodeEncerrar"] = true
+				if res, err := s.st.Tally(ctx, round.ID); err == nil {
+					data["Depositados"] = res.Depositados
+					data["Presentes"] = res.Presentes
+				}
+			} else if round.Numero < store.MaxRounds {
+				data["PodeProximo"] = true
+			}
+		}
+	} else {
+		data["PodeAbrir"] = true
+	}
+	return data, nil
+}
+
+// board é a aba "Escrutínio": foco no cargo da vez + uma ação, com progresso.
+func (s *Server) board(w http.ResponseWriter, r *http.Request) {
+	data, err := s.boardData(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	s.render(w, "board.html", data)
+}
+
+// boardFragment: só a parte viva da aba Escrutínio (re-buscada via SSE/htmx).
+func (s *Server) boardFragment(w http.ResponseWriter, r *http.Request) {
+	data, err := s.boardData(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	s.render(w, "boardLive", data)
+}
+
+// credenciamento é a aba dedicada: busca (nome/igreja) + filtros + ação inline (JS no template).
+func (s *Server) credenciamento(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	q, _ := s.st.Quorum(ctx, cong.ID)
+	electors, err := s.st.Electors(ctx, cong.ID)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	locals, _ := s.st.Locals(ctx, cong.ID)
+	s.render(w, "credenciamento.html", map[string]any{
+		"Active": "credenciamento", "Congresso": cong, "Quorum": q,
+		"Electors": electors, "Locals": locals,
+	})
+}
+
+// historico é a aba do log de operações (Desfazer/Restaurar + zona de perigo).
+func (s *Server) historico(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	ops, err := s.st.Operations(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	s.render(w, "historico.html", map[string]any{
+		"Active": "historico", "Congresso": cong, "Operations": ops,
+	})
+}
+
+func (s *Server) undo(w http.ResponseWriter, r *http.Request) {
+	if err := s.st.UndoLast(r.Context()); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Operação desfeita.", false)
+}
+
+type diffRow struct {
+	Label, De, Para string
+	Mudou           bool
+}
+
+func statusTxt(c store.CargoState) string {
+	switch c.Status {
+	case "decidido":
+		return "eleito: " + c.Eleito
+	case "em_eleicao":
+		return "em eleição"
+	default:
+		return "pendente"
+	}
+}
+
+func eleicaoTxt(encerrada bool) string {
+	if encerrada {
+		return "encerrada"
+	}
+	return "em andamento"
+}
+
+func buildDiff(cur, tgt store.StateSummary) ([]diffRow, bool) {
+	d := func(label, de, para string) diffRow { return diffRow{label, de, para, de != para} }
+	rows := []diffRow{
+		d("Situação", eleicaoTxt(cur.Encerrada), eleicaoTxt(tgt.Encerrada)),
+		d("Presentes", strconv.Itoa(cur.Presentes), strconv.Itoa(tgt.Presentes)),
+		d("Credenciados", strconv.Itoa(cur.Credenciados), strconv.Itoa(tgt.Credenciados)),
+		d("Votos registrados", strconv.Itoa(cur.TotalVotos), strconv.Itoa(tgt.TotalVotos)),
+	}
+	n := len(tgt.Cargos)
+	if len(cur.Cargos) > n {
+		n = len(cur.Cargos)
+	}
+	for i := 0; i < n; i++ {
+		var cc, tc store.CargoState
+		nome := ""
+		if i < len(tgt.Cargos) {
+			tc = tgt.Cargos[i]
+			nome = tc.Nome
+		}
+		if i < len(cur.Cargos) {
+			cc = cur.Cargos[i]
+			if nome == "" {
+				nome = cc.Nome
+			}
+		}
+		rows = append(rows, d(nome, statusTxt(cc), statusTxt(tc)))
+	}
+	changed := false
+	for _, r := range rows {
+		if r.Mudou {
+			changed = true
+		}
+	}
+	return rows, changed
+}
+
+// restorePreview devolve o fragmento do modal: diff "antes → depois" da restauração.
+func (s *Server) restorePreview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	opID, _ := strconv.ParseInt(r.URL.Query().Get("op_id"), 10, 64)
+	cur, err := s.st.SummarizeCurrent(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	tgt, desc, err := s.st.SummarizeSnapshot(ctx, opID)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	rows, changed := buildDiff(cur, tgt)
+	s.render(w, "restore_preview", map[string]any{
+		"OpID": opID, "Desc": desc, "Rows": rows, "Changed": changed,
+	})
+}
+
+func (s *Server) restore(w http.ResponseWriter, r *http.Request) {
+	opID, _ := strconv.ParseInt(r.FormValue("op_id"), 10, 64)
+	if err := s.st.RestoreToOp(r.Context(), opID); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board/historico", "Estado restaurado.", false)
+}
+
+func (s *Server) reiniciar(w http.ResponseWriter, r *http.Request) {
+	cong, err := s.st.FirstCongress(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.st.ReiniciarEleicao(r.Context(), cong.ID); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Eleição reiniciada.", true)
+}
+
+func (s *Server) encerrarEleicao(w http.ResponseWriter, r *http.Request) {
+	cong, err := s.st.FirstCongress(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.st.EncerrarEleicao(r.Context(), cong.ID); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Eleição encerrada.", true)
+}
+
+func (s *Server) reabrirEleicao(w http.ResponseWriter, r *http.Request) {
+	cong, err := s.st.FirstCongress(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.st.ReabrirEleicao(r.Context(), cong.ID); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Eleição reaberta.", false)
+}
+
+// historicoFragment: a parte viva do Histórico (lista de operações + zona de perigo).
+func (s *Server) historicoFragment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	ops, err := s.st.Operations(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	s.render(w, "historicoLive", map[string]any{"Congresso": cong, "Operations": ops})
+}
+
+// ---------------------------------------------------------------------------
+// Ações
+// ---------------------------------------------------------------------------
+
+func (s *Server) credenciar(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	electorID, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
+	code, err := s.st.Credenciar(ctx, cong.ID, electorID)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		el, _ := s.st.GetElector(ctx, electorID)
+		q, _ := s.st.Quorum(ctx, cong.ID)
+		w.Header().Set("HX-Trigger", `{"openToken":true}`)
+		s.render(w, "credResult", map[string]any{"Token": code, "Row": el, "Quorum": q})
+		return
+	}
+	s.render(w, "token.html", map[string]any{"Token": code, "Reissue": false})
+}
+
+func (s *Server) reissue(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	code, err := s.st.IssueToken(ctx, cong.ID)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		q, _ := s.st.Quorum(ctx, cong.ID)
+		w.Header().Set("HX-Trigger", `{"openToken":true}`)
+		s.render(w, "credResult", map[string]any{"Token": code, "Row": nil, "Quorum": q})
+		return
+	}
+	s.render(w, "token.html", map[string]any{"Token": code, "Reissue": true})
+}
+
+func (s *Server) presenca(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	electorID, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
+	presente := r.FormValue("presente") == "1"
+	if err := s.st.SetPresente(ctx, electorID, presente); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		el, _ := s.st.GetElector(ctx, electorID)
+		s.render(w, "credRow", map[string]any{"E": el, "OOB": false})
+		return
+	}
+	http.Redirect(w, r, "/board/credenciamento", http.StatusSeeOther)
+}
+
+func (s *Server) declararQuorum(w http.ResponseWriter, r *http.Request) {
+	cong, err := s.st.FirstCongress(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := s.st.DeclararQuorum(r.Context(), cong.ID); err != nil {
+		fail(w, err)
+		return
+	}
+	s.actionDone(w, r, "/board", "Quórum declarado.", false)
+}
+
+func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	positionID, _ := strconv.ParseInt(r.FormValue("position_id"), 10, 64)
+	if _, err := s.st.AbrirCargo(ctx, cong.ID, positionID, nil); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Escrutínio aberto.", false)
+}
+
+func (s *Server) encerrar(w http.ResponseWriter, r *http.Request) {
+	roundID, _ := strconv.ParseInt(r.FormValue("round_id"), 10, 64)
+	if _, err := s.st.EncerrarEscrutinio(r.Context(), roundID); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Escrutínio encerrado.", false)
+}
+
+func (s *Server) proximo(w http.ResponseWriter, r *http.Request) {
+	positionID, _ := strconv.ParseInt(r.FormValue("position_id"), 10, 64)
+	if _, err := s.st.AbrirProximoEscrutinio(r.Context(), positionID); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.actionDone(w, r, "/board", "Novo escrutínio aberto.", false)
+}
+
+// report monta a saída imprimível: Verificação de Poderes + resultado de cada escrutínio.
+func (s *Server) report(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cong, err := s.st.FirstCongress(ctx)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	q, err := s.st.Quorum(ctx, cong.ID)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	positions, err := s.st.Positions(ctx, cong.ID)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+
+	type cargoReport struct {
+		Position store.Position
+		Results  []store.Result
+	}
+	var cargos []cargoReport
+	for _, p := range positions {
+		rounds, err := s.st.Rounds(ctx, p.ID)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		cr := cargoReport{Position: p}
+		for _, rd := range rounds {
+			res, err := s.st.Tally(ctx, rd.ID)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			cr.Results = append(cr.Results, res)
+		}
+		cargos = append(cargos, cr)
+	}
+	s.render(w, "report.html", map[string]any{"Congresso": cong, "Quorum": q, "Cargos": cargos})
+}

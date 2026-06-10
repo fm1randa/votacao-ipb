@@ -1,0 +1,20 @@
+{{define "restore_preview"}}
+<h2 style="margin-top:0">Restaurar este ponto?</h2>
+<p class="mut">Volta ao estado de <strong>"{{.Desc}}"</strong>. Veja o que muda:</p>
+<table style="margin:10px 0">
+  <tr><th></th><th class="mut" style="font-weight:600">agora</th><th class="mut" style="font-weight:600">depois</th></tr>
+  {{range .Rows}}
+    <tr style="{{if .Mudou}}background:color-mix(in srgb, var(--gold) 12%, var(--surface)){{end}}">
+      <td>{{.Label}}</td>
+      <td class="mut">{{.De}}</td>
+      <td><strong>{{if .Mudou}}→ {{end}}{{.Para}}</strong></td>
+    </tr>
+  {{end}}
+</table>
+{{if not .Changed}}<p class="mut">Nada muda — este já é o estado atual.</p>{{end}}
+<form hx-post="/board/restore" hx-swap="none" hx-on::after-request="document.getElementById('m-restore').classList.remove('open')">
+  <input type="hidden" name="op_id" value="{{.OpID}}">
+  <button type="submit"{{if not .Changed}} disabled style="opacity:.5"{{end}}>Confirmar restauração</button>
+</form>
+<button type="button" class="ghost" data-close>Cancelar</button>
+{{end}}

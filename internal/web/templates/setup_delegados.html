@@ -1,0 +1,46 @@
+{{define "setup_delegados.html"}}<!doctype html><html lang="pt-br"><head><title>Cadastrar delegados</title>{{template "styles"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
+  <p class="eyebrow">Primeira configuração · passo 3 de 3</p>
+  <h1>Delegados</h1>
+  <p class="mut">Cadastre o rol agora ou conclua e adicione depois, na aba Credenciar.</p>
+
+  <div class="card">
+    <h2>Colar lista</h2>
+    <form method="post" action="/board/delegados/import">
+      <input type="hidden" name="next" value="/board/setup?step=delegados">
+      <textarea name="lista" rows="6" placeholder="Um por linha:&#10;Maria Silva; IP Central&#10;João Souza; IP do Jardim"
+        style="width:100%; font-family:var(--sans); font-size:1rem; padding:12px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink)"></textarea>
+      <button type="submit" class="ghost">Importar lista</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Adicionar um a um</h2>
+    <form method="post" action="/board/delegados/add">
+      <input type="hidden" name="next" value="/board/setup?step=delegados">
+      <label class="mut" for="nome">Nome</label>
+      <input type="text" id="nome" name="nome" required>
+      <label class="mut" for="igreja" style="display:block; margin-top:10px">UMP local (igreja)</label>
+      <input type="text" id="igreja" name="igreja" list="igrejas" placeholder="criada automaticamente se nova">
+      <datalist id="igrejas">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+        <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)">
+        Membro nato (diretoria atual / secretário) — sem igreja</label>
+      <button type="submit" class="ghost">Adicionar</button>
+    </form>
+  </div>
+
+  {{if .Electors}}
+  <div class="card">
+    <h2>Cadastrados ({{len .Electors}})</h2>
+    {{range .Electors}}
+      <div class="row" style="border-top:1px solid var(--line); padding:8px 0">
+        <span>{{.Nome}}</span><span class="mut">{{if .Nato}}nato{{else}}{{.LocalNome}}{{end}}</span>
+      </div>
+    {{end}}
+  </div>
+  {{end}}
+
+  <a class="btn" href="/board">Concluir configuração</a>
+</div></body></html>{{end}}

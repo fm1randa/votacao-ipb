@@ -1,0 +1,23 @@
+{{define "home.html"}}<!doctype html><html lang="pt-br"><head><title>Votação</title>{{template "styles"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand"><img src="/assets/img/logo_ipb.png" alt="Igreja Presbiteriana do Brasil"></div>
+  {{if .Setup}}
+    <header style="text-align:center">
+      <p class="eyebrow">Votação de congresso</p>
+      <h1>Bem-vindo</h1>
+    </header>
+    <div class="card" style="text-align:center">
+      <p class="mut">O sistema ainda não foi configurado. A mesa define o PIN, os dados
+        do congresso e o rol de delegados em poucos passos.</p>
+      <a class="btn" href="/board/setup">Configurar agora</a>
+    </div>
+  {{else}}
+    <header style="text-align:center">
+      <p class="eyebrow">{{.Congresso.Federacao}}</p>
+      <h1>Congresso {{.Congresso.Ano}}</h1>
+    </header>
+    <a class="btn" href="/delegado">Sou delegado</a>
+    <a class="ghost btn" href="/board">Sou da mesa</a>
+    <a class="ghost btn" href="/screen">Telão</a>
+  {{end}}
+</div></body></html>{{end}}

@@ -1,0 +1,11 @@
+{{define "token.html"}}<!doctype html><html lang="pt-br"><head><title>Token</title>{{template "styles"}}</head>
+<body><div class="wrap">
+  <div class="card stagger" style="text-align:center; margin-top:36px">
+    <p class="eyebrow">{{if .Reissue}}Token reemitido{{else}}Credencial{{end}}</p>
+    <h2 style="margin-top:0">{{if .Reissue}}Novo código{{else}}Entregue ao delegado{{end}}</h2>
+    <p class="big" style="letter-spacing:.12em">{{.Token}}</p>
+    <p class="mut">Não anote a quem foi entregue — o sigilo depende disso.</p>
+    {{if .Reissue}}<p class="pill warn">reemissão: o código antigo não pôde ser revogado (token cego)</p>{{end}}
+    <a class="btn" href="/board/credenciamento" style="margin-top:14px">Voltar ao credenciamento</a>
+  </div>
+</div></body></html>{{end}}

@@ -1,0 +1,54 @@
+{{define "historico.html"}}<!doctype html><html lang="pt-br"><head><title>Histórico — Mesa</title>{{template "styles"}}{{template "htmxjs"}}</head>
+<body>
+<div class="shell">
+  {{template "mesanav" .}}
+  <main class="content"><div class="wrap has-bottomnav">
+    <p class="eyebrow">{{.Congresso.Federacao}}</p>
+    <h1>Histórico</h1>
+    <p class="mut">Toda ação da mesa fica registrada. Você pode desfazer a última ou voltar a qualquer ponto — nada se perde.</p>
+    <div hx-ext="sse" sse-connect="/events">
+      <div hx-get="/board/historico/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
+        {{template "historicoLive" .}}
+      </div>
+    </div>
+  </div></main>
+</div>
+{{template "mesabottom" .}}
+{{template "mesatoast" .}}
+
+<!-- Modal de restaurar: corpo (o diff antes→depois) carregado sob demanda. -->
+<div class="modal-backdrop" id="m-restore"><div class="modal wide" id="restore-body"></div></div>
+
+<script>
+  document.addEventListener('click', function(e){
+    var open = e.target.closest('[data-modal]');
+    if (open) { document.getElementById(open.dataset.modal).classList.add('open'); return; }
+    var close = e.target.closest('[data-close]');
+    if (close) { close.closest('.modal-backdrop').classList.remove('open'); return; }
+    var rest = e.target.closest('[data-op]');
+    if (rest) {
+      var body = document.getElementById('restore-body');
+      body.innerHTML = '<p class="mut">Carregando…</p>';
+      document.getElementById('m-restore').classList.add('open');
+      fetch('/board/restore/preview?op_id=' + rest.dataset.op).then(function(r){ return r.text(); }).then(function(html){ body.innerHTML = html; });
+      return;
+    }
+    if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');
+  });
+</script>
+</body></html>{{end}}
+
+{{define "historicoLive"}}
+  <div class="card">
+    <h2>Operações</h2>
+    {{range .Operations}}
+      <div class="row" style="border-top:1px solid var(--line); padding:11px 0">
+        <div><strong>{{.Descricao}}</strong><br><span class="mut" style="font-size:.85rem">{{.CriadoEm}}</span></div>
+        <button type="button" class="ghost sm" data-op="{{.ID}}">Restaurar</button>
+      </div>
+    {{else}}
+      <p class="mut">Nenhuma operação registrada ainda.</p>
+    {{end}}
+  </div>
+
+{{end}}

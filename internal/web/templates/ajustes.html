@@ -1,0 +1,103 @@
+{{define "ajustes.html"}}<!doctype html><html lang="pt-br"><head><title>Ajustes — Mesa</title>{{template "styles"}}{{template "htmxjs"}}</head>
+<body>
+<div class="shell">
+  {{template "mesanav" .}}
+  <main class="content"><div class="wrap has-bottomnav">
+    <p class="eyebrow">Configuração</p>
+    <h1>Ajustes</h1>
+    <form hx-post="/board/ajustes" hx-swap="none">
+      <div class="card">
+        <h2>Congresso</h2>
+        <label class="mut" for="federacao">Nome da federação</label>
+        <input type="text" id="federacao" name="federacao" required value="{{.Congresso.Federacao}}">
+        <label class="mut" for="ano" style="display:block; margin-top:12px">Ano do congresso</label>
+        <input type="text" id="ano" name="ano" inputmode="numeric" required value="{{.Congresso.Ano}}">
+      </div>
+      <button type="submit">Salvar</button>
+      <a class="ghost btn" href="/board">Voltar</a>
+    </form>
+    <div id="cargos-config">{{template "cargosConfig" .}}</div>
+
+    <p class="mut" style="margin-top:18px">Delegados são geridos na aba <a href="/board/credenciamento">Credenciar</a>.</p>
+
+    <div hx-ext="sse" sse-connect="/events">
+      <div hx-get="/board/ajustes/zona" hx-trigger="sse:tick" hx-target="this" hx-swap="innerHTML">
+        {{template "zonaPerigo" .}}
+      </div>
+    </div>
+  </div></main>
+</div>
+{{template "mesabottom" .}}
+{{template "mesatoast" .}}
+
+<div class="modal-backdrop" id="m-reiniciar"><div class="modal">
+  <h2>Reiniciar a eleição?</h2>
+  <p class="mut">Apaga <strong>todos os escrutínios e votos</strong> e zera o credenciamento (presença e tokens). Mantém cargos e o rol de delegados. <strong>É restaurável</strong> pelo Histórico.</p>
+  <form hx-post="/board/eleicao/reiniciar" hx-swap="none" hx-on::after-request="document.getElementById('m-reiniciar').classList.remove('open')">
+    <button type="submit" class="danger">Sim, reiniciar</button></form>
+  <button type="button" class="ghost" data-close>Cancelar</button>
+</div></div>
+
+<div class="modal-backdrop" id="m-encerrar"><div class="modal">
+  <h2>Encerrar a eleição?</h2>
+  <p class="mut">Trava novas votações; o sistema fica só leitura. Você pode reabrir depois. <strong>Restaurável.</strong></p>
+  <form hx-post="/board/eleicao/encerrar" hx-swap="none" hx-on::after-request="document.getElementById('m-encerrar').classList.remove('open')">
+    <button type="submit">Sim, encerrar</button></form>
+  <button type="button" class="ghost" data-close>Cancelar</button>
+</div></div>
+
+<div class="modal-backdrop" id="m-reabrir"><div class="modal">
+  <h2>Reabrir a eleição?</h2>
+  <p class="mut">Volta a permitir abrir escrutínios e votar.</p>
+  <form hx-post="/board/eleicao/reabrir" hx-swap="none" hx-on::after-request="document.getElementById('m-reabrir').classList.remove('open')">
+    <button type="submit">Sim, reabrir</button></form>
+  <button type="button" class="ghost" data-close>Cancelar</button>
+</div></div>
+
+<script>
+  document.addEventListener('click', function(e){
+    var open = e.target.closest('[data-modal]');
+    if (open) { document.getElementById(open.dataset.modal).classList.add('open'); return; }
+    if (e.target.closest('[data-close]')) { e.target.closest('.modal-backdrop').classList.remove('open'); return; }
+    if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');
+  });
+</script>
+</body></html>{{end}}
+
+{{define "cargosConfig"}}
+<form hx-post="/board/ajustes/cargos" hx-target="#cargos-config" hx-swap="innerHTML">
+  <div class="card">
+    <h2>Cargos da diretoria</h2>
+    <p class="mut">Federações menores podem acumular cargos (GTSI, Art. 13).
+      Presidente, Secretário e Tesoureiro são obrigatórios; cargos em eleição ou
+      decididos precisam ser desfeitos pelo Histórico antes de desativar.</p>
+    {{range .Positions}}
+      {{$opcional := or (eq .Seq 2) (eq .Seq 3) (eq .Seq 5)}}
+      {{$travado := and $opcional .Ativo (ne .Status "pendente")}}
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px{{if not $opcional}}; opacity:.65{{end}}">
+        <input type="checkbox" name="cargo{{.Seq}}" value="1"
+          {{if .Ativo}}checked{{end}} {{if or (not $opcional) $travado}}disabled{{end}}
+          style="width:20px;height:20px;accent-color:var(--green)">
+        {{.Nome}}
+        {{if not $opcional}}<span style="opacity:.7">(obrigatório)</span>
+        {{else if $travado}}<span class="pill warn">{{.Status}} — desfaça antes</span>{{end}}
+      </label>
+    {{end}}
+    <button type="submit" style="margin-top:14px">Salvar cargos</button>
+  </div>
+</form>
+{{end}}
+
+{{define "zonaPerigo"}}
+<div class="card" style="border-color:color-mix(in srgb, var(--bad) 40%, var(--line))">
+  <h2 style="color:var(--bad)">Zona de perigo</h2>
+  {{if .Congresso.Encerrada}}
+    <p class="mut">A eleição está <strong>encerrada</strong> (só leitura).</p>
+    <button type="button" class="ghost" data-modal="m-reabrir">Reabrir a eleição</button>
+  {{else}}
+    <p class="mut">Ações destrutivas — todas restauráveis pelo Histórico.</p>
+    <button type="button" class="ghost" data-modal="m-encerrar">Encerrar a eleição</button>
+    <button type="button" class="danger" data-modal="m-reiniciar">Reiniciar a eleição</button>
+  {{end}}
+</div>
+{{end}}

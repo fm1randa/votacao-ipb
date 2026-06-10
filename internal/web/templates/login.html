@@ -1,0 +1,15 @@
+{{define "login.html"}}<!doctype html><html lang="pt-br"><head><title>Mesa</title>{{template "styles"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
+  <p class="eyebrow">Operação</p>
+  <h1>Área da Mesa</h1>
+  {{if .Erro}}<div class="erro">PIN incorreto.</div>{{end}}
+  <form method="post" action="/board/login">
+    <div class="card">
+      <label class="mut" for="pin">PIN da Mesa</label>
+      <input type="password" id="pin" name="pin" autocomplete="off" required autofocus>
+    </div>
+    <button type="submit">Entrar</button>
+    <a class="ghost btn" href="/">Voltar</a>
+  </form>
+</div></body></html>{{end}}

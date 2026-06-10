@@ -1,0 +1,45 @@
+{{define "delegado.html"}}<!doctype html><html lang="pt-br"><head><title>Área do delegado</title>{{template "styles"}}{{template "htmxjs"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand"><img src="/assets/img/logo_ipb.png" alt="Igreja Presbiteriana do Brasil"></div>
+  <header style="text-align:center">
+    <p class="eyebrow">{{.Congresso.Federacao}}</p>
+    <h1>Congresso {{.Congresso.Ano}}</h1>
+  </header>
+  <div hx-ext="sse" sse-connect="/events">
+    <div hx-get="/delegado/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
+      {{template "delegadoLive" .}}
+    </div>
+  </div>
+  <form method="post" action="/delegado/logout"><button class="ghost">Sair</button></form>
+</div></body></html>{{end}}
+
+{{define "delegadoLive"}}
+  {{if eq .Estado "aberta"}}
+    <div class="card">
+      <div class="row">
+        <div>
+          <h2 style="margin:0">{{.Cargo}}</h2>
+          <p class="mut" style="margin:.1em 0 0">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}}</p>
+        </div>
+        <span class="dot" style="background:var(--ok)" title="votação aberta"></span>
+      </div>
+      <a class="btn" href="/vote">Votar</a>
+    </div>
+  {{else if eq .Estado "votou"}}
+    <div class="card">
+      <div class="row">
+        <p style="margin:0"><strong>Você já votou!</strong> Obrigado.</p>
+        <span class="dot" style="background:var(--gold)" title="voto registrado"></span>
+      </div>
+      <a class="btn" aria-disabled="true">Votar</a>
+    </div>
+  {{else}}
+    <div class="card">
+      <div class="row">
+        <p class="mut" style="margin:0">Nenhuma votação aberta no momento.</p>
+        <span class="dot" style="background:var(--line)" title="aguardando a mesa"></span>
+      </div>
+      <a class="btn" aria-disabled="true">Votar</a>
+    </div>
+  {{end}}
+{{end}}

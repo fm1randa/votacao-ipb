@@ -1,0 +1,48 @@
+{{define "delegado_login.html"}}<!doctype html><html lang="pt-br"><head><title>Área do delegado</title>{{template "styles"}}</head>
+<body><div class="wrap stagger">
+  <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
+  <p class="eyebrow">Operação</p>
+  <h1>Área do delegado</h1>
+  {{if .Erro}}<div class="erro">Código inválido. Confira com a mesa.</div>{{end}}
+  <form method="post" action="/delegado/login" id="f">
+    <input type="hidden" name="token" id="tokenField">
+    <div class="card">
+      <label class="mut" style="display:block; margin-bottom:10px">Seu código</label>
+      <div class="otp" id="otp">
+        <input inputmode="text" autocomplete="one-time-code" autocapitalize="characters" maxlength="1" aria-label="código 1" autofocus>
+        <input inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="1" aria-label="código 2">
+        <input inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="1" aria-label="código 3">
+        <input inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="1" aria-label="código 4">
+      </div>
+    </div>
+    <div class="erro" id="msg" style="display:none">Digite o código completo.</div>
+    <button type="submit">Entrar</button>
+    <a class="ghost btn" href="/">Voltar</a>
+  </form>
+  <script>
+    var LEN = 4, boxes = Array.from(document.querySelectorAll('#otp input')), msg = document.getElementById('msg');
+    function code(){ return boxes.map(function(b){ return b.value; }).join(''); }
+    function setCode(s){ for (var i = 0; i < LEN; i++) boxes[i].value = (s[i] || '').toUpperCase(); }
+    boxes.forEach(function(b, i){
+      b.addEventListener('input', function(){
+        b.value = b.value.toUpperCase().slice(-1);
+        if (b.value && i < LEN - 1) boxes[i + 1].focus();
+      });
+      b.addEventListener('keydown', function(e){
+        if (e.key === 'Backspace' && !b.value && i > 0) boxes[i - 1].focus();
+      });
+      b.addEventListener('paste', function(e){
+        e.preventDefault();
+        setCode((e.clipboardData.getData('text') || '').replace(/\s/g, ''));
+        boxes[Math.min(code().length, LEN - 1)].focus();
+      });
+    });
+    document.getElementById('f').addEventListener('submit', function(e){
+      if (code().length < LEN) {
+        e.preventDefault(); msg.style.display = 'block';
+        boxes[code().length].focus(); return;
+      }
+      document.getElementById('tokenField').value = code();
+    });
+  </script>
+</div></body></html>{{end}}

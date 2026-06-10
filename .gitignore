@@ -1,0 +1,14 @@
+# Banco da eleição (dados do evento — nunca versionar)
+votacao.db
+votacao.db-shm
+votacao.db-wal
+*.db
+
+# Binários de build
+votacao-android
+votacao
+votacao.exe
+
+# Artefatos locais
+.playwright-mcp/
+.DS_Store

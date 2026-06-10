@@ -1,0 +1,45 @@
+{{define "mesaitems"}}
+  <a class="navitem {{if eq .Active "escrutinio"}}active{{end}}" href="/board">
+    <svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-3-7 3z"/><path d="M9 9h6M9 13h4"/></svg><span>Escrutínio</span></a>
+  <a class="navitem {{if eq .Active "credenciamento"}}active{{end}}" href="/board/credenciamento">
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 3-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M16 11l2 2 3.5-3.5"/></svg><span>Credenciar</span></a>
+  <a class="navitem" href="/screen">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg><span>Telão</span></a>
+  <a class="navitem {{if eq .Active "relatorio"}}active{{end}}" href="/report">
+    <svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg><span>Relatório</span></a>
+  <a class="navitem {{if eq .Active "historico"}}active{{end}}" href="/board/historico">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v3.5h3.5"/><path d="M12 8v4l3 2"/></svg><span>Histórico</span></a>
+{{end}}
+
+{{define "mesanav"}}
+<nav class="sidebar">
+  <a href="/" class="brand"><img src="/assets/img/logo_ipb.png" alt="IPB"></a>
+  {{template "mesaitems" .}}
+  <div class="sidebar-foot">
+    <a class="navitem" href="/"><svg viewBox="0 0 24 24"><path d="M5 12l7-7 7 7M7 10v9h10v-9"/></svg><span>Início</span></a>
+  </div>
+</nav>
+{{end}}
+
+{{define "mesabottom"}}
+<nav class="bottomnav">{{template "mesaitems" .}}</nav>
+{{end}}
+
+{{define "mesatoast"}}
+<div id="toast-root"></div>
+<script>
+  // Toast disparado pelo header HX-Trigger das ações (ADR-0008).
+  document.body.addEventListener('toast', function(e){
+    var d = e.detail || {}; if (typeof d === 'string') d = { msg: d };
+    var t = document.createElement('div'); t.className = 'toast';
+    var s = document.createElement('span'); s.textContent = d.msg || 'Pronto.'; t.appendChild(s);
+    if (d.undo) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Desfazer';
+      b.addEventListener('click', function(){ if (window.htmx) htmx.ajax('POST', '/board/undo', { swap: 'none' }); t.remove(); });
+      t.appendChild(b);
+    }
+    document.getElementById('toast-root').appendChild(t);
+    setTimeout(function(){ t.remove(); }, 7000);
+  });
+</script>
+{{end}}

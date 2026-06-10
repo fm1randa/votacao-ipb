@@ -1,0 +1,95 @@
+{{define "board.html"}}<!doctype html><html lang="pt-br"><head><title>Escrutínio — Mesa</title>{{template "styles"}}{{template "htmxjs"}}</head>
+<body>
+<div class="shell">
+  {{template "mesanav" .}}
+  <main class="content"><div class="wrap has-bottomnav">
+    <p class="eyebrow">{{.Congresso.Federacao}} · {{.Congresso.Ano}}</p>
+    <div class="row">
+      <h1>Escrutínio</h1>
+      <a href="/board/ajustes" aria-label="Ajustes" title="Ajustes" class="mut" style="display:inline-flex">
+        <svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8">
+          <circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"/></svg></a>
+    </div>
+    <div hx-ext="sse" sse-connect="/events">
+      <div hx-get="/board/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
+        {{template "boardLive" .}}
+      </div>
+    </div>
+  </div></main>
+</div>
+{{template "mesabottom" .}}
+{{template "mesatoast" .}}
+</body></html>{{end}}
+
+{{define "boardLive"}}
+  {{if .Congresso.Encerrada}}<div class="card" style="border-color:var(--gold)">
+    <strong>Eleição encerrada</strong> — só leitura. Reabra pelo Histórico para alterar.</div>{{end}}
+
+  <div class="card">
+    <div class="row">
+      <div><span class="num">{{.Quorum.LocaisRepresentadas}}/{{.Quorum.LocaisTotal}}</span>
+        <div class="mut">UMPs locais</div></div>
+      <div style="text-align:right"><span class="num">{{.Quorum.Presentes}}</span>
+        <div class="mut">presentes</div></div>
+    </div>
+    <p style="margin-top:10px">
+      {{if .Quorum.LocaisOk}}<span class="pill on">há quórum</span>{{else}}<span class="pill off">sem quórum</span>{{end}}
+      {{if .Congresso.QuorumDeclarado}}<span class="pill on">declarado</span>{{end}}
+    </p>
+    {{if not .Congresso.QuorumDeclarado}}
+      <form hx-post="/board/quorum" hx-swap="none"><button class="ok">Declarar quórum</button></form>
+    {{end}}
+  </div>
+
+  {{if .Concluido}}
+    <div class="card" style="text-align:center">
+      <p class="eyebrow">Concluído</p>
+      <h2 style="margin-top:0">Eleição concluída</h2>
+      <p class="mut">Todos os cargos foram decididos.</p>
+      <a class="btn" href="/report">Ver relatório</a>
+    </div>
+  {{else}}
+    <div class="card">
+      <p class="eyebrow">Cargo {{.AtualIdx}} de {{.Total}}</p>
+      <h2 style="margin-top:0">{{.Atual.Nome}}</h2>
+      {{if .Round}}
+        <p class="mut">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}} —
+          {{if eq .Round.Status "aberto"}}<span class="pill on">aberto</span>{{else}}<span class="pill off">encerrado</span>{{end}}</p>
+        {{if .PodeEncerrar}}
+          <div class="row" style="margin:6px 0"><span class="mut">votaram</span><strong>{{.Depositados}} / {{.Presentes}}</strong></div>
+          <div class="bar"><span style="width:{{pct .Depositados .Presentes}}%"></span></div>
+          <a class="ghost btn" href="/screen" style="margin-top:14px">Abrir telão</a>
+          <form hx-post="/board/escrutinio/encerrar" hx-swap="none">
+            <input type="hidden" name="round_id" value="{{.Round.ID}}">
+            <button class="danger">Encerrar escrutínio</button></form>
+        {{else if .PodeProximo}}
+          <p class="mut">Ninguém atingiu a maioria. Abra o próximo escrutínio.</p>
+          <a class="ghost btn" href="/screen/{{.Round.ID}}">Ver resultado anterior</a>
+          <form hx-post="/board/escrutinio/proximo" hx-swap="none">
+            <input type="hidden" name="position_id" value="{{.Atual.ID}}">
+            <button>Abrir {{if eq .Round.Numero 2}}3º escrutínio (2º turno){{else}}próximo escrutínio{{end}}</button></form>
+        {{end}}
+      {{else}}
+        {{if .Congresso.QuorumDeclarado}}
+          <form hx-post="/board/cargo/abrir" hx-swap="none">
+            <input type="hidden" name="position_id" value="{{.Atual.ID}}">
+            <button>Abrir escrutínio</button></form>
+        {{else}}
+          <p class="mut">Declare o quórum acima para abrir o escrutínio.</p>
+        {{end}}
+      {{end}}
+    </div>
+  {{end}}
+
+  <div class="card">
+    <h2>Progresso da diretoria</h2>
+    {{range .Positions}}
+      <div class="row" style="border-top:1px solid var(--line); padding:9px 0">
+        <span>{{.Nome}}</span>
+        {{if eq .Status "decidido"}}<span class="pill on">✓ {{.EleitoNome}}</span>
+        {{else if eq .Status "em_eleicao"}}<span class="pill warn">em eleição</span>
+        {{else}}<span class="pill off">pendente</span>{{end}}
+      </div>
+    {{end}}
+  </div>
+{{end}}

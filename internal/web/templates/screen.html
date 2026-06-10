@@ -1,0 +1,104 @@
+{{define "telaostyles"}}
+<style>
+  .reveal { animation:reveal 700ms var(--ease) both; }
+  @keyframes reveal { from { opacity:0; transform:scale(.96); } to { opacity:1; transform:none; } }
+  .eleito { border:2px solid var(--gold); box-shadow:0 0 0 1px var(--gold), 0 18px 60px -20px var(--gold); }
+  .eleito .big { color:var(--gold); }
+
+  /* O telão aproveita o horizontal do projetor: coluna larga, resultado+placar
+     lado a lado e reconciliação em faixa de estatísticas. */
+  .t-wrap { max-width:1160px; }
+  .t-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center; margin-top:6px; }
+  .t-stat .num { display:block; }
+  .t-stat .mut { font-size:.82rem; }
+  @media (min-width:980px) {
+    .t-wrap h1 { font-size:2.6rem; }
+    .t-wrap .big { font-size:4.2rem; }
+    .t-wrap .bar { height:16px; }
+    .t-cols { display:grid; grid-template-columns:5fr 4fr; gap:0 16px; align-items:start; }
+    .t-stats { grid-template-columns:repeat(6,1fr); }
+    .t-head { text-align:center; }
+  }
+</style>
+{{end}}
+
+{{define "screen.html"}}<!doctype html><html lang="pt-br"><head><title>{{.PositionNome}} — telão</title>
+{{template "styles"}}{{template "htmxjs"}}{{template "telaostyles"}}</head>
+<body class="dark">
+  <div hx-ext="sse" sse-connect="/events">
+    <div class="wrap t-wrap">
+      <div id="telao-live" hx-get="/screen/{{.Round.ID}}/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
+        {{template "telaoLive" .}}
+      </div>
+      <div class="card" style="display:flex; align-items:center; justify-content:center; gap:18px">
+        <img src="/qr.png" alt="QR code de acesso" style="width:108px; border-radius:10px; flex:none">
+        <div><strong>Vote pelo celular</strong><br><span class="mut">{{baseURL}}</span></div>
+      </div>
+      <a class="ghost btn" href="/">Voltar ao início</a>
+    </div>
+  </div>
+</body></html>{{end}}
+
+{{define "telaoLive"}}
+  <div class="t-head">
+    <div class="brand brand--screen"><img src="/assets/img/logo_ipb3.png" alt="Igreja Presbiteriana do Brasil"></div>
+    <p class="eyebrow" style="color:var(--gold)">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}}</p>
+    <h1>{{.PositionNome}}</h1>
+    <p class="mut" style="margin-top:-.2em">
+      {{if eq .Round.Status "aberto"}}<span class="pill on">em votação</span>{{else}}<span class="pill off">encerrado</span>{{end}}</p>
+  </div>
+
+  {{if eq .Round.Status "aberto"}}
+    {{/* ADR-0001: enquanto aberto, só progresso — nunca placar por candidato. */}}
+    <div class="card" style="text-align:center">
+      <div class="big">{{.Depositados}} <span class="mut" style="font-size:1.4rem">de</span> {{.Presentes}}</div>
+      <p class="mut">votaram</p>
+      <div class="bar" style="margin-top:6px"><span style="width:{{pct .Depositados .Presentes}}%"></span></div>
+    </div>
+  {{else}}
+    <div class="t-cols">
+      <div>
+        {{if .Eleito}}
+          <div class="card eleito reveal" style="text-align:center">
+            <p class="eyebrow" style="color:var(--gold)">Eleito</p>
+            <p class="big" style="margin:.1em 0">{{.Eleito.Nome}}</p>
+            <p class="mut">{{.Eleito.Votos}} votos{{if .Round.Runoff}} · 2º turno{{else}} · maioria exigida: {{.Maioria}}{{end}}</p>
+          </div>
+        {{else if .EmpateNaoResolvido}}
+          <div class="card reveal" style="border:2px solid var(--gold)">
+            <p class="eyebrow" style="color:var(--gold)">Empate no 2º turno</p>
+            <p class="mut">Empate e sem data de nascimento para o desempate por idade (Art. 91g). A mesa decide e registra em ata.</p>
+          </div>
+        {{else}}
+          <div class="card mut">Ninguém atingiu a maioria absoluta ({{.Maioria}} de {{.Depositados}} depositados). Haverá novo escrutínio.</div>
+        {{end}}
+      </div>
+
+      <div class="card">
+        {{range .Lines}}
+          <div style="margin:11px 0">
+            <div class="row"><strong>{{.Nome}}{{if .LocalNome}} <span class="mut">· {{.LocalNome}}</span>{{end}}</strong>
+              <span>{{.Votos}}{{if .Eleito}} ✓{{end}}</span></div>
+            <div class="bar"><span style="width:{{pct .Votos $.Depositados}}%"></span></div>
+          </div>
+        {{else}}<p class="mut">Sem votos em candidatos.</p>{{end}}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <h2 style="margin:0">Reconciliação</h2>
+        {{if le .Depositados .Presentes}}<span class="pill on">✓ depositados ≤ presentes</span>
+        {{else}}<span class="pill" style="background:color-mix(in srgb,var(--bad) 18%,var(--surface));color:var(--bad)">⚠ depositados &gt; presentes — apurar</span>{{end}}
+      </div>
+      <div class="t-stats">
+        <div class="t-stat"><span class="num">{{.Presentes}}</span><span class="mut">presentes</span></div>
+        <div class="t-stat"><span class="num">{{.Depositados}}</span><span class="mut">depositados</span></div>
+        <div class="t-stat"><span class="num">{{.Brancos}}</span><span class="mut">brancos</span></div>
+        <div class="t-stat"><span class="num">{{.Nulos}}</span><span class="mut">nulos</span></div>
+        <div class="t-stat"><span class="num">{{.Abstencoes}}</span><span class="mut">abstenções</span></div>
+        <div class="t-stat"><span class="num">{{.Maioria}}</span><span class="mut">maioria exigida</span></div>
+      </div>
+    </div>
+  {{end}}
+{{end}}
