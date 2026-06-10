@@ -7,101 +7,128 @@
     {{if eq ambito "local"}}Importante: o rol completo de sócios ativos é o denominador do quórum (Art. 12 §2º).{{end}}</p>
 
   <div class="card">
-    <h2>Colar lista</h2>
-    <form method="post" action="/board/delegados/import">
-      <input type="hidden" name="next" value="/board/setup?step=delegados">
-      <p class="mut">Um por linha: <code>{{template "importFormato" .}}</code></p>
-      <textarea name="lista" rows="6" placeholder="{{template "importExemplo" .}}"
-        style="width:100%; font-family:var(--sans); font-size:1rem; padding:12px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink)"></textarea>
-      <button type="submit" class="ghost">Importar lista</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2 id="f-titulo">Adicionar um a um</h2>
-    <form method="post" action="/board/delegados/add" id="f-ind">
-      <input type="hidden" name="next" value="/board/setup?step=delegados">
-      <input type="hidden" name="elector_id" id="f-eid" value="">
-      <label class="mut" for="nome">Nome</label>
-      <input type="text" id="nome" name="nome" required>
-      {{if ne ambito "local"}}
-        <label class="mut" for="igreja" style="display:block; margin-top:10px">{{term "unidade"}}</label>
-        <input type="text" id="igreja" name="igreja" list="igrejas" placeholder="criada automaticamente se nova">
-        <datalist id="igrejas">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
-        {{if eq ambito "nacional"}}
-          <label class="mut" for="subunidade" style="display:block; margin-top:10px">{{term "subunidade"}}</label>
-          <input type="text" id="subunidade" name="subunidade" list="subunidades" placeholder="criada automaticamente se nova">
-          <datalist id="subunidades">{{range .SubLocals}}<option value="{{.Nome}}">{{end}}</datalist>
-        {{end}}
-      {{end}}
-      <label class="mut" for="nascimento" style="display:block; margin-top:10px">Nascimento (desempate e elegibilidade)</label>
-      <input type="date" id="nascimento" name="nascimento" required>
-      {{if ne ambito "local"}}
-        <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
-          <input type="checkbox" name="nato" value="1" id="f-nato" style="width:20px;height:20px;accent-color:var(--green)">
-          Membro nato (diretoria atual / secretário) — sem {{term "unidade"}}</label>
-      {{end}}
-      <button type="submit" class="ghost" id="f-submit">Adicionar</button>
-      <button type="button" class="ghost" id="f-cancelar" style="display:none">Cancelar edição</button>
-    </form>
-  </div>
-
-  {{if .Electors}}
-  <div class="card">
-    <h2>Cadastrados ({{len .Electors}})</h2>
-    {{range .Electors}}
-      <div class="row" style="border-top:1px solid var(--line); padding:8px 0; gap:10px"
-           data-id="{{.ID}}" data-nome="{{.Nome}}" data-igreja="{{.LocalNome}}" data-sub="{{.SubLocalNome}}"
-           data-nasc="{{if .Nascimento.Valid}}{{.Nascimento.String}}{{end}}" data-nato="{{if .Nato}}1{{else}}0{{end}}">
-        <div><strong>{{.Nome}}</strong><br>
-          <span class="mut" style="font-size:.85rem">
-            {{if .Nato}}nato{{else}}{{.LocalNome}}{{if .SubLocalNome}} · {{.SubLocalNome}}{{end}}{{end}}
-            {{if .Nascimento.Valid}}{{if not .Nato}}{{if .LocalNome}} · {{end}}{{end}}{{dataBR .Nascimento.String}}{{end}}
-          </span></div>
-        <div style="flex:none">
-          <button type="button" class="ghost sm" data-editar>Editar</button>
-          <form method="post" action="/board/delegados/delete" style="display:inline"
-                onsubmit="return confirm('Remover {{.Nome}} do rol?')">
-            <input type="hidden" name="elector_id" value="{{.ID}}">
-            <input type="hidden" name="next" value="/board/setup?step=delegados">
-            <button type="submit" class="ghost sm" style="color:var(--bad)">Remover</button>
-          </form>
+    <div class="row" style="gap:8px">
+      <button class="sm" data-modal="m-add" type="button" style="flex:1">+ Adicionar</button>
+      <button class="ghost sm" data-modal="m-import" type="button" style="flex:1">Colar lista</button>
+    </div>
+    {{if .Electors}}
+      <h2 style="margin-top:16px">Cadastrados ({{len .Electors}})</h2>
+      {{range .Electors}}
+        <div class="row" style="border-top:1px solid var(--line); padding:8px 0; gap:10px"
+             data-id="{{.ID}}" data-nome="{{.Nome}}" data-igreja="{{.LocalNome}}" data-sub="{{.SubLocalNome}}"
+             data-nasc="{{if .Nascimento.Valid}}{{.Nascimento.String}}{{end}}" data-nato="{{if .Nato}}1{{else}}0{{end}}">
+          <div><strong>{{.Nome}}</strong><br>
+            <span class="mut" style="font-size:.85rem">
+              {{if .Nato}}nato{{else}}{{.LocalNome}}{{if .SubLocalNome}} · {{.SubLocalNome}}{{end}}{{end}}
+              {{if .Nascimento.Valid}}{{if not .Nato}}{{if .LocalNome}} · {{end}}{{end}}{{dataBR .Nascimento.String}}{{end}}
+            </span></div>
+          <div style="flex:none">
+            <button type="button" class="ghost sm" data-editar>Editar</button>
+            <form method="post" action="/board/delegados/delete" style="display:inline"
+                  onsubmit="return confirm('Remover {{.Nome}} do rol?')">
+              <input type="hidden" name="elector_id" value="{{.ID}}">
+              <input type="hidden" name="next" value="/board/setup?step=delegados">
+              <button type="submit" class="ghost sm" style="color:var(--bad)">Remover</button>
+            </form>
+          </div>
         </div>
-      </div>
+      {{end}}
+    {{else}}
+      <p class="mut" style="margin-top:14px">Ninguém cadastrado ainda.</p>
     {{end}}
   </div>
-  {{end}}
 
   <a class="btn" href="/board">Concluir configuração</a>
+</div>
 
-  <script>
-    // Editar: preenche o form individual e troca a ação para /update.
-    var f = document.getElementById('f-ind');
-    var set = function(id, v){ var el = document.getElementById(id); if (el) el.value = v; };
-    document.addEventListener('click', function(e){
-      var btn = e.target.closest('[data-editar]');
-      if (btn) {
-        var r = btn.closest('[data-id]');
-        set('f-eid', r.dataset.id);
-        set('nome', r.dataset.nome);
-        set('igreja', r.dataset.nato === '1' ? '' : r.dataset.igreja);
-        set('subunidade', r.dataset.nato === '1' ? '' : (r.dataset.sub || ''));
-        set('nascimento', r.dataset.nasc || '');
-        var nato = document.getElementById('f-nato'); if (nato) nato.checked = r.dataset.nato === '1';
-        f.action = '/board/delegados/update';
-        document.getElementById('f-titulo').textContent = 'Editar ' + r.dataset.nome;
-        document.getElementById('f-submit').textContent = 'Salvar alterações';
-        document.getElementById('f-cancelar').style.display = '';
-        f.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.getElementById('nome').focus();
-      }
-    });
-    document.getElementById('f-cancelar').addEventListener('click', function(){
-      f.reset(); set('f-eid', '');
-      f.action = '/board/delegados/add';
-      document.getElementById('f-titulo').textContent = 'Adicionar um a um';
-      document.getElementById('f-submit').textContent = 'Adicionar';
-      this.style.display = 'none';
-    });
-  </script>
-</div></body></html>{{end}}
+<div class="modal-backdrop" id="m-add"><div class="modal">
+  <h2>Adicionar {{term "votante"}}</h2>
+  <form method="post" action="/board/delegados/add">
+    <input type="hidden" name="next" value="/board/setup?step=delegados">
+    <label class="mut" for="a-nome">Nome</label>
+    <input type="text" id="a-nome" name="nome" required>
+    {{if ne ambito "local"}}
+      <label class="mut" for="a-igreja" style="display:block; margin-top:10px">{{term "unidade"}}</label>
+      <input type="text" id="a-igreja" name="igreja" list="igrejas" placeholder="criada automaticamente se nova">
+      {{if eq ambito "nacional"}}
+        <label class="mut" for="a-sub" style="display:block; margin-top:10px">{{term "subunidade"}}</label>
+        <input type="text" id="a-sub" name="subunidade" list="subunidades" placeholder="criada automaticamente se nova">
+      {{end}}
+    {{end}}
+    <label class="mut" for="a-nasc" style="display:block; margin-top:10px">Nascimento (desempate e elegibilidade)</label>
+    <input type="date" id="a-nasc" name="nascimento" required>
+    {{if ne ambito "local"}}
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+        <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)">
+        Membro nato (diretoria atual / secretário) — sem {{term "unidade"}}</label>
+    {{end}}
+    <button type="submit">Adicionar</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+</div></div>
+
+<div class="modal-backdrop" id="m-import"><div class="modal">
+  <h2>Colar lista</h2>
+  <form method="post" action="/board/delegados/import">
+    <input type="hidden" name="next" value="/board/setup?step=delegados">
+    <p class="mut">Um por linha: <code>{{template "importFormato" .}}</code></p>
+    <textarea name="lista" rows="8" placeholder="{{template "importExemplo" .}}"
+      style="width:100%; font-family:var(--sans); font-size:1rem; padding:12px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink)"></textarea>
+    <button type="submit">Importar</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+</div></div>
+
+<div class="modal-backdrop" id="m-edit"><div class="modal">
+  <h2>Editar cadastro</h2>
+  <form method="post" action="/board/delegados/update">
+    <input type="hidden" name="next" value="/board/setup?step=delegados">
+    <input type="hidden" name="elector_id" id="e-id">
+    <label class="mut" for="e-nome">Nome</label>
+    <input type="text" id="e-nome" name="nome" required>
+    {{if ne ambito "local"}}
+      <label class="mut" for="e-igreja" style="display:block; margin-top:10px">{{term "unidade"}}</label>
+      <input type="text" id="e-igreja" name="igreja" list="igrejas">
+      {{if eq ambito "nacional"}}
+        <label class="mut" for="e-sub" style="display:block; margin-top:10px">{{term "subunidade"}}</label>
+        <input type="text" id="e-sub" name="subunidade" list="subunidades">
+      {{end}}
+    {{end}}
+    <label class="mut" for="e-nasc" style="display:block; margin-top:10px">Nascimento</label>
+    <input type="date" id="e-nasc" name="nascimento" required>
+    {{if ne ambito "local"}}
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+        <input type="checkbox" name="nato" value="1" id="e-nato" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem {{term "unidade"}})</label>
+    {{end}}
+    <button type="submit">Salvar</button>
+    <button type="button" class="ghost" data-close>Cancelar</button>
+  </form>
+</div></div>
+
+<datalist id="igrejas">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
+<datalist id="subunidades">{{range .SubLocals}}<option value="{{.Nome}}">{{end}}</datalist>
+
+<script>
+  // Mesmo padrão de modais da aba de credenciamento (abrir/fechar + form zerado).
+  function closeModal(b){ b.classList.remove('open'); b.querySelectorAll('form').forEach(function(f){ f.reset(); }); }
+  document.addEventListener('click', function(e){
+    var open = e.target.closest('[data-modal]');
+    if (open) { document.getElementById(open.dataset.modal).classList.add('open'); return; }
+    if (e.target.closest('[data-close]')) { closeModal(e.target.closest('.modal-backdrop')); return; }
+    var btn = e.target.closest('[data-editar]');
+    if (btn) {
+      var r = btn.closest('[data-id]');
+      var set = function(id, v){ var el = document.getElementById(id); if (el) el.value = v; };
+      set('e-id', r.dataset.id);
+      set('e-nome', r.dataset.nome);
+      set('e-igreja', r.dataset.nato === '1' ? '' : r.dataset.igreja);
+      set('e-sub', r.dataset.nato === '1' ? '' : (r.dataset.sub || ''));
+      set('e-nasc', r.dataset.nasc || '');
+      var nato = document.getElementById('e-nato'); if (nato) nato.checked = r.dataset.nato === '1';
+      document.getElementById('m-edit').classList.add('open');
+      return;
+    }
+    if (e.target.classList.contains('modal-backdrop')) closeModal(e.target);
+  });
+</script>
+</body></html>{{end}}
