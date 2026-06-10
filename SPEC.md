@@ -82,8 +82,14 @@ Guia de Trabalho das Sociedades Internas da IPB (2015)**, Regimento Interno
 **Vice-presidente, Secretário Executivo e 2º Secretário** (no wizard e em Ajustes);
 Presidente, 1º Secretário e Tesoureiro são obrigatórios. Sem o 2º Secretário, o 1º
 exibe-se apenas como **"Secretário"**. Cargo **em eleição ou decidido não pode ser
-desabilitado** (desfaça pelo Histórico antes). Respaldo: GTSI Art. 13 (UMP local)
-admite diretoria mínima "Presidente, Secretário e Tesoureiro" em casos especiais.
+desabilitado** (desfaça pelo Histórico antes).
+
+> ⚠️ **Base normativa (verificada 2026-06-10):** para Federações, o Art. 26a é
+> **prescritivo** — diretoria completa, **sem** cláusula de mínimo. A diretoria
+> reduzida "Presidente, Secretário e Tesoureiro" só tem previsão **expressa** para
+> a **sociedade local** (Art. 13, "em casos especiais"; idem o "quando houver" do
+> §3º). Reduzir a diretoria da Federação é prática por **analogia** — confirme com
+> o Secretário Presbiterial antes do congresso (ver §9).
 
 ## 4. Regra de cálculo da maioria [decisão]
 
@@ -251,3 +257,6 @@ offline, confiança > impacto).
    lista de UMPs locais federadas (base do quórum) — dados a carregar no rol.
 3. **Coletar data de nascimento** dos delegados para automatizar o desempate por
    idade (Art. 91g), ou deixar o desempate manual na mesa?
+4. **Diretoria reduzida na Federação:** o Art. 26a prevê a diretoria completa, sem
+   cláusula de mínimo (a redução expressa é só da sociedade local, Art. 13). Se a
+   federação for usar menos cargos (§3.5), validar com o Secretário Presbiterial.
