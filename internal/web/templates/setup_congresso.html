@@ -33,13 +33,22 @@
       <label class="mut" for="ano" style="display:block; margin-top:12px">Ano da eleição</label>
       <input type="text" id="ano" name="ano" inputmode="numeric" required value="{{.AnoDefault}}">
     </div>
-    <div id="cargos-preset"
-         hx-get="/board/setup/cargos" hx-trigger="change from:#f-cong [name=ambito], change from:#sociedade"
-         hx-include="#f-cong" hx-swap="innerHTML">
+    <div id="cargos-preset">
       {{template "cargosPreset" .}}
     </div>
     <button type="submit">Continuar</button>
   </form>
+  <script>
+    // Trocar âmbito/sociedade recarrega o bloco de cargos (o preset muda).
+    function reloadCargos(){
+      var amb = document.querySelector('#f-cong [name=ambito]:checked').value;
+      var soc = document.getElementById('sociedade').value;
+      htmx.ajax('GET', '/board/setup/cargos?ambito=' + amb + '&sociedade=' + encodeURIComponent(soc),
+        { target: '#cargos-preset', swap: 'innerHTML' });
+    }
+    document.querySelectorAll('#f-cong [name=ambito]').forEach(function(r){ r.addEventListener('change', reloadCargos); });
+    document.getElementById('sociedade').addEventListener('change', reloadCargos);
+  </script>
 </div></body></html>{{end}}
 
 {{/* Bloco de cargos do preset (âmbito × sociedade) — recarregado via htmx. */}}
@@ -63,7 +72,7 @@
         <input type="checkbox" name="cargo_{{.Role}}" value="1" checked
           {{if not .Optional}}disabled{{end}} style="width:20px;height:20px;accent-color:var(--green)">
         {{.Nome}}{{if not .Optional}} <span style="opacity:.7">(obrigatório)</span>{{end}}
-        {{if eq .Role "segundo_sec"}}<span style="opacity:.7">(sem ele, o 1º vira só "Secretário(a)")</span>{{end}}
+        {{if and .Optional (eq .Role "segundo_sec")}}<span style="opacity:.7">(sem ele, o 1º vira só "Secretário(a)")</span>{{end}}
       </label>
     {{end}}
   </div>
