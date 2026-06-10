@@ -4,10 +4,11 @@ votacao.db-shm
 votacao.db-wal
 *.db
 
-# Binários de build
-votacao-android
-votacao
-votacao.exe
+# Binários de build (ancorados na raiz — sem isso, "votacao" casaria com
+# qualquer diretório de mesmo nome, ex. o package Kotlin android/.../app/votacao)
+/votacao-android
+/votacao
+/votacao.exe
 
 # Artefatos locais
 .playwright-mcp/
