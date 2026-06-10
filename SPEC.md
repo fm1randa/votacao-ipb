@@ -296,7 +296,7 @@ que varia é configuração e vocabulário.
 | Quem vota | Sócio Ativo presente | Delegado credenciado | idem | idem |
 | Termo na UI | "Sócio", "Chamada" | "Delegado", "Credenciar" | idem | idem |
 | Unidade de representação | — (pessoas) | UMP local | Federação | Sinodal **+ Federação** |
-| Quórum (Art. 12 §2º, 49) | > ½ dos sócios ativos do rol | > ½ das UMPs locais | > ½ das Federações | > ½ das Sinodais **e** ≥ ⅓ das Federações |
+| Quórum (Art. 12 §2º, 49) | > ½ dos sócios ativos do rol | > ½ das UMPs locais | > ½ das Federações | > ½ das Sinodais **+ critério de Federações por sociedade** (ver abaixo) |
 | Cargos (preset) | Pres, Vice, 1º Sec, 2º Sec, Tes (sem Sec. Exec; redução **expressa** a Pres/Sec/Tes — Art. 13) | Art. 26a completo | = Federação | Pres, **vices regionais** (5; SAF 6), Sec. Exec, 1º+2º Sec, Tes |
 | Natos (Art. 52) | não há | sim | sim | sim |
 | Indicação (Art. 91d) | não prevista (Art. 90 omite) | opcional | opcional | opcional |
@@ -306,7 +306,11 @@ que varia é configuração e vocabulário.
 - **Quórum computado como gate [decisão]:** ver §3.3 — "Declarar abertura" só
   habilita com quórum atingido; sem override; rol é a fonte da verdade.
 - **Nacional com hierarquia completa:** o rol nacional registra **Sinodal e
-  Federação** de cada delegado; o sistema computa os dois critérios do Art. 49c.
+  Federação** de cada delegado. O critério de Federações **varia por sociedade**
+  no GTSI vigente: **UMP** ≥ ⅓ das Federações (Art. 49c); **UPH** (Art. 134) e
+  **SAF** (Art. 91) mais da metade das Federações; **UPA** (Art. 62) sem critério
+  de Federações (só ½ das Sinodais). A **UCP não possui Confederação Nacional**
+  ("pela sua excepcionalidade", Específica UCP) — o âmbito é bloqueado.
 - **Vices regionais são cargos separados** ("Vice-presidente Norte", …), cada um
   com seus escrutínios. O sistema **não valida** a região do candidato (o GTSI
   só diz "representando").

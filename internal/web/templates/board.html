@@ -35,8 +35,10 @@
       <div class="row">
         <div><span class="num">{{.Quorum.UnidadesRepr}}/{{.Quorum.UnidadesTotal}}</span>
           <div class="mut">Sinodais (> metade)</div></div>
-        <div><span class="num">{{.Quorum.SubRepr}}/{{.Quorum.SubTotal}}</span>
-          <div class="mut">Federações (≥ ⅓)</div></div>
+        {{if .Quorum.SubRegra}}
+          <div><span class="num">{{.Quorum.SubRepr}}/{{.Quorum.SubTotal}}</span>
+            <div class="mut">Federações ({{if eq .Quorum.SubRegra "terco"}}≥ ⅓{{else}}> metade{{end}})</div></div>
+        {{end}}
         <div style="text-align:right"><span class="num">{{.Quorum.Presentes}}</span>
           <div class="mut">presentes</div></div>
       </div>

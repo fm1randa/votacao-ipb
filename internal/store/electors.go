@@ -43,18 +43,20 @@ type Elector struct {
 //   - local:      mais da metade dos sócios ativos do ROL (pessoas);
 //   - federacao:  mais da metade das UMPs locais representadas;
 //   - sinodal:    mais da metade das Federações representadas;
-//   - nacional:   mais da metade das Sinodais E ≥ 1/3 das Federações (subunidades).
+//   - nacional:   mais da metade das Sinodais + o critério de Federações da
+//     sociedade (NacionalSubRegra — UMP ⅓, UPH/SAF metade, UPA nenhum).
 //
 // `Ok` é o gate computado da Declaração de Abertura (ADR-0010).
 type QuorumInfo struct {
 	Ambito          string
-	Presentes       int // pessoas presentes (headcount)
-	Credenciados    int // já receberam token alguma vez
-	RolTotal        int // total do rol (denominador no âmbito local)
-	UnidadesTotal   int // unidades primárias cadastradas (nivel 0)
-	UnidadesRepr    int // unidades com ≥1 delegado presente
-	SubTotal        int // só nacional: federações cadastradas (nivel 1)
-	SubRepr         int // só nacional: federações com ≥1 delegado presente
+	Presentes       int    // pessoas presentes (headcount)
+	Credenciados    int    // já receberam token alguma vez
+	RolTotal        int    // total do rol (denominador no âmbito local)
+	UnidadesTotal   int    // unidades primárias cadastradas (nivel 0)
+	UnidadesRepr    int    // unidades com ≥1 delegado presente
+	SubTotal        int    // só nacional: federações cadastradas (nivel 1)
+	SubRepr         int    // só nacional: federações com ≥1 delegado presente
+	SubRegra        string // só nacional: SubRegraTerco | SubRegraMetade | SubRegraNada
 	Ok              bool
 	TokensEntregues int
 	Reemissoes      int // tokens entregues além dos credenciados (perdas)
@@ -65,8 +67,8 @@ type QuorumInfo struct {
 // ---------------------------------------------------------------------------
 
 func (s *Store) CreateCongress(ctx context.Context, ambito, sociedade, nome string, ano int) (int64, error) {
-	if !ValidAmbito(ambito) || !ValidSociedade(sociedade) {
-		return 0, errors.New("âmbito ou sociedade inválidos")
+	if err := ValidateAmbitoSociedade(ambito, sociedade); err != nil {
+		return 0, err
 	}
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO congress(ambito, sociedade, nome, ano) VALUES (?, ?, ?, ?)`,
@@ -152,8 +154,8 @@ func (s *Store) applyPositionPreset(ctx context.Context, congressID int64, ambit
 // sociedade re-aplica o preset de cargos e só é permitido antes da Declaração
 // de Abertura e sem escrutínios (SPEC §10.1).
 func (s *Store) UpdateCongress(ctx context.Context, id int64, ambito, sociedade, nome string, ano int) error {
-	if !ValidAmbito(ambito) || !ValidSociedade(sociedade) {
-		return errors.New("âmbito ou sociedade inválidos")
+	if err := ValidateAmbitoSociedade(ambito, sociedade); err != nil {
+		return err
 	}
 	cur, err := s.FirstCongress(ctx)
 	if err != nil {
@@ -534,9 +536,16 @@ func (s *Store) Quorum(ctx context.Context, congressID int64) (QuorumInfo, error
 		// Art. 12 §2º: mais da metade dos sócios ativos do rol.
 		q.Ok = q.RolTotal > 0 && q.Presentes*2 > q.RolTotal
 	case AmbitoNacional:
-		// Art. 49c: mais da metade das Sinodais E pelo menos 1/3 das Federações.
-		q.Ok = q.UnidadesTotal > 0 && q.UnidadesRepr*2 > q.UnidadesTotal &&
-			q.SubTotal > 0 && q.SubRepr*3 >= q.SubTotal
+		// Mais da metade das Sinodais + critério de Federações da sociedade
+		// (UMP Art. 49c: ⅓; UPH Art. 134 / SAF Art. 91: metade; UPA Art. 62: nenhum).
+		q.SubRegra = NacionalSubRegra(cong.Sociedade)
+		q.Ok = q.UnidadesTotal > 0 && q.UnidadesRepr*2 > q.UnidadesTotal
+		switch q.SubRegra {
+		case SubRegraTerco:
+			q.Ok = q.Ok && q.SubTotal > 0 && q.SubRepr*3 >= q.SubTotal
+		case SubRegraMetade:
+			q.Ok = q.Ok && q.SubTotal > 0 && q.SubRepr*2 > q.SubTotal
+		}
 	default:
 		// Art. 49a–b: mais da metade das unidades (UMPs locais / Federações).
 		q.Ok = q.UnidadesTotal > 0 && q.UnidadesRepr*2 > q.UnidadesTotal

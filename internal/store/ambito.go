@@ -5,8 +5,14 @@ package store
 // quórum, os limites de idade para concorrer e o vocabulário da UI (SPEC §10).
 
 import (
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	errInvalidAmbito  = errors.New("âmbito ou sociedade inválidos")
+	errUCPSemNacional = errors.New("a UCP não possui Confederação Nacional (GTSI, Específica UCP)")
 )
 
 // Âmbitos (nível da entidade cuja Diretoria se elege).
@@ -35,6 +41,40 @@ func ValidSociedade(s string) bool {
 		}
 	}
 	return false
+}
+
+// ValidateAmbitoSociedade valida a combinação. A UCP não possui Confederação
+// Nacional ("pela sua excepcionalidade" — GTSI, Específica UCP).
+func ValidateAmbitoSociedade(ambito, sociedade string) error {
+	if !ValidAmbito(ambito) || !ValidSociedade(sociedade) {
+		return errInvalidAmbito
+	}
+	if ambito == AmbitoNacional && sociedade == "UCP" {
+		return errUCPSemNacional
+	}
+	return nil
+}
+
+// Critério de subunidades (Federações) no quórum do Congresso Nacional — varia
+// por sociedade no GTSI vigente:
+//   - UMP (Art. 49c): mais da metade das Sinodais E ≥ 1/3 das Federações;
+//   - UPH (Art. 134) e SAF (Art. 91): mais da metade das Sinodais E das Federações;
+//   - UPA (Art. 62): só mais da metade das Sinodais.
+const (
+	SubRegraTerco  = "terco"  // ≥ 1/3 das Federações (UMP)
+	SubRegraMetade = "metade" // > 1/2 das Federações (UPH, SAF)
+	SubRegraNada   = ""       // sem critério de Federações (UPA)
+)
+
+// NacionalSubRegra devolve o critério de Federações do quórum Nacional.
+func NacionalSubRegra(sociedade string) string {
+	switch sociedade {
+	case "UMP":
+		return SubRegraTerco
+	case "UPH", "SAF":
+		return SubRegraMetade
+	}
+	return SubRegraNada
 }
 
 // ---------------------------------------------------------------------------

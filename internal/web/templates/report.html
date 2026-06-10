@@ -27,7 +27,9 @@
     <tr><td>Presentes</td><td>{{.Quorum.Presentes}}{{if eq .Quorum.Ambito "local"}} de {{.Quorum.RolTotal}} do rol{{end}}</td></tr>
     {{if eq .Quorum.Ambito "nacional"}}
       <tr><td>Sinodais representadas</td><td>{{.Quorum.UnidadesRepr}} de {{.Quorum.UnidadesTotal}}</td></tr>
-      <tr><td>Federações representadas</td><td>{{.Quorum.SubRepr}} de {{.Quorum.SubTotal}} (mínimo ⅓)</td></tr>
+      {{if .Quorum.SubRegra}}
+        <tr><td>Federações representadas</td><td>{{.Quorum.SubRepr}} de {{.Quorum.SubTotal}} ({{if eq .Quorum.SubRegra "terco"}}mínimo ⅓{{else}}mais da metade{{end}})</td></tr>
+      {{end}}
     {{else if ne .Quorum.Ambito "local"}}
       <tr><td>{{term "unidades"}} representadas</td><td>{{.Quorum.UnidadesRepr}} de {{.Quorum.UnidadesTotal}}</td></tr>
     {{end}}

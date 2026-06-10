@@ -106,7 +106,7 @@ func (s *Server) setupCongresso(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := s.st.SetupCongress(r.Context(), ambito, sociedade, nome, ano,
 		disabledRolesFrom(r, ambito, sociedade)); err != nil {
-		fail(w, err)
+		http.Error(w, err.Error(), 400) // ex.: UCP não tem Confederação Nacional
 		return
 	}
 	http.Redirect(w, r, "/board/setup", http.StatusSeeOther)

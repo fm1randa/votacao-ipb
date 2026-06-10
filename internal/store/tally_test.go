@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"testing"
 )
@@ -407,6 +408,60 @@ func TestQuorumNacional_Composto(t *testing.T) {
 	q, _ := st.Quorum(ctx, cong)
 	if !q.Ok || q.UnidadesRepr != 2 || q.SubRepr != 2 {
 		t.Fatalf("2/2 sinodais + 2/6 federações deveria dar quórum: %+v", q)
+	}
+}
+
+func TestQuorumNacional_PorSociedade(t *testing.T) {
+	ctx := context.Background()
+	// Cenário comum: 2 Sinodais (ambas representadas) e 4 Federações, 1 representada.
+	monta := func(t *testing.T, soc string) (*Store, int64) {
+		st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+		t.Cleanup(func() { st.Close() })
+		cong, err := st.SetupCongress(ctx, AmbitoNacional, soc, "Nacional "+soc, 2026, nil)
+		must(t, err)
+		sin1, _ := st.AddLocal(ctx, cong, "Sinodal A", 0)
+		sin2, _ := st.AddLocal(ctx, cong, "Sinodal B", 0)
+		var feds []int64
+		for _, nome := range []string{"F1", "F2", "F3", "F4"} {
+			id, _ := st.AddLocal(ctx, cong, nome, 1)
+			feds = append(feds, id)
+		}
+		for i, sin := range []int64{sin1, sin2} {
+			id, err := st.AddElector(ctx, cong, fmt.Sprintf("D%d", i), &sin, &feds[0], false, "1999-01-01")
+			must(t, err)
+			_, err = st.Credenciar(ctx, cong, id)
+			must(t, err)
+		}
+		return st, cong
+	}
+	// UMP: 1/4 federações < 1/3 → sem quórum.
+	st, cong := monta(t, "UMP")
+	if q, _ := st.Quorum(ctx, cong); q.Ok || q.SubRegra != SubRegraTerco {
+		t.Fatalf("UMP: 1/4 federações não atinge 1/3: %+v", q)
+	}
+	// UPH: 1/4 federações < metade → sem quórum (regra mais dura).
+	st, cong = monta(t, "UPH")
+	if q, _ := st.Quorum(ctx, cong); q.Ok || q.SubRegra != SubRegraMetade {
+		t.Fatalf("UPH: 1/4 federações não é mais da metade: %+v", q)
+	}
+	// UPA: federações não contam → 2/2 sinodais bastam.
+	st, cong = monta(t, "UPA")
+	if q, _ := st.Quorum(ctx, cong); !q.Ok || q.SubRegra != SubRegraNada {
+		t.Fatalf("UPA: 2/2 sinodais deveria bastar (sem critério de federações): %+v", q)
+	}
+}
+
+func TestUCP_SemConfederacaoNacional(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	if _, err := st.SetupCongress(ctx, AmbitoNacional, "UCP", "X", 2026, nil); err == nil {
+		t.Fatal("UCP não possui Confederação Nacional — setup deveria falhar")
+	}
+	cong, err := st.SetupCongress(ctx, AmbitoSinodal, "UCP", "Sinodal UCP", 2026, nil)
+	must(t, err)
+	if err := st.UpdateCongress(ctx, cong, AmbitoNacional, "UCP", "X", 2026); err == nil {
+		t.Fatal("trocar UCP para âmbito nacional deveria falhar")
 	}
 }
 
