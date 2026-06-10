@@ -18,9 +18,10 @@
   </div>
 
   <div class="card">
-    <h2>Adicionar um a um</h2>
-    <form method="post" action="/board/delegados/add">
+    <h2 id="f-titulo">Adicionar um a um</h2>
+    <form method="post" action="/board/delegados/add" id="f-ind">
       <input type="hidden" name="next" value="/board/setup?step=delegados">
+      <input type="hidden" name="elector_id" id="f-eid" value="">
       <label class="mut" for="nome">Nome</label>
       <input type="text" id="nome" name="nome" required>
       {{if ne ambito "local"}}
@@ -34,13 +35,14 @@
         {{end}}
       {{end}}
       <label class="mut" for="nascimento" style="display:block; margin-top:10px">Nascimento (desempate e elegibilidade)</label>
-      <input type="text" id="nascimento" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric" required>
+      <input type="date" id="nascimento" name="nascimento" required>
       {{if ne ambito "local"}}
         <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
-          <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)">
+          <input type="checkbox" name="nato" value="1" id="f-nato" style="width:20px;height:20px;accent-color:var(--green)">
           Membro nato (diretoria atual / secretário) — sem {{term "unidade"}}</label>
       {{end}}
-      <button type="submit" class="ghost">Adicionar</button>
+      <button type="submit" class="ghost" id="f-submit">Adicionar</button>
+      <button type="button" class="ghost" id="f-cancelar" style="display:none">Cancelar edição</button>
     </form>
   </div>
 
@@ -48,12 +50,58 @@
   <div class="card">
     <h2>Cadastrados ({{len .Electors}})</h2>
     {{range .Electors}}
-      <div class="row" style="border-top:1px solid var(--line); padding:8px 0">
-        <span>{{.Nome}}</span><span class="mut">{{if .Nato}}nato{{else}}{{.LocalNome}}{{if .SubLocalNome}} · {{.SubLocalNome}}{{end}}{{end}}</span>
+      <div class="row" style="border-top:1px solid var(--line); padding:8px 0; gap:10px"
+           data-id="{{.ID}}" data-nome="{{.Nome}}" data-igreja="{{.LocalNome}}" data-sub="{{.SubLocalNome}}"
+           data-nasc="{{if .Nascimento.Valid}}{{.Nascimento.String}}{{end}}" data-nato="{{if .Nato}}1{{else}}0{{end}}">
+        <div><strong>{{.Nome}}</strong><br>
+          <span class="mut" style="font-size:.85rem">
+            {{if .Nato}}nato{{else}}{{.LocalNome}}{{if .SubLocalNome}} · {{.SubLocalNome}}{{end}}{{end}}
+            {{if .Nascimento.Valid}}{{if not .Nato}}{{if .LocalNome}} · {{end}}{{end}}{{dataBR .Nascimento.String}}{{end}}
+          </span></div>
+        <div style="flex:none">
+          <button type="button" class="ghost sm" data-editar>Editar</button>
+          <form method="post" action="/board/delegados/delete" style="display:inline"
+                onsubmit="return confirm('Remover {{.Nome}} do rol?')">
+            <input type="hidden" name="elector_id" value="{{.ID}}">
+            <input type="hidden" name="next" value="/board/setup?step=delegados">
+            <button type="submit" class="ghost sm" style="color:var(--bad)">Remover</button>
+          </form>
+        </div>
       </div>
     {{end}}
   </div>
   {{end}}
 
   <a class="btn" href="/board">Concluir configuração</a>
+
+  <script>
+    // Editar: preenche o form individual e troca a ação para /update.
+    var f = document.getElementById('f-ind');
+    var set = function(id, v){ var el = document.getElementById(id); if (el) el.value = v; };
+    document.addEventListener('click', function(e){
+      var btn = e.target.closest('[data-editar]');
+      if (btn) {
+        var r = btn.closest('[data-id]');
+        set('f-eid', r.dataset.id);
+        set('nome', r.dataset.nome);
+        set('igreja', r.dataset.nato === '1' ? '' : r.dataset.igreja);
+        set('subunidade', r.dataset.nato === '1' ? '' : (r.dataset.sub || ''));
+        set('nascimento', r.dataset.nasc || '');
+        var nato = document.getElementById('f-nato'); if (nato) nato.checked = r.dataset.nato === '1';
+        f.action = '/board/delegados/update';
+        document.getElementById('f-titulo').textContent = 'Editar ' + r.dataset.nome;
+        document.getElementById('f-submit').textContent = 'Salvar alterações';
+        document.getElementById('f-cancelar').style.display = '';
+        f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('nome').focus();
+      }
+    });
+    document.getElementById('f-cancelar').addEventListener('click', function(){
+      f.reset(); set('f-eid', '');
+      f.action = '/board/delegados/add';
+      document.getElementById('f-titulo').textContent = 'Adicionar um a um';
+      document.getElementById('f-submit').textContent = 'Adicionar';
+      this.style.display = 'none';
+    });
+  </script>
 </div></body></html>{{end}}

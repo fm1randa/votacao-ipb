@@ -127,6 +127,13 @@ func New(st *store.Store, addr, host string) (*Server, error) {
 		"term":      s.term,
 		"ambito":    func() string { return s.cong().Ambito },
 		"sociedade": func() string { return s.cong().Sociedade },
+		// dataBR: exibe data ISO (banco) como DD/MM/AAAA.
+		"dataBR": func(iso string) string {
+			if t, err := time.Parse("2006-01-02", iso); err == nil {
+				return t.Format("02/01/2006")
+			}
+			return iso
+		},
 		"pct": func(v, total int) int {
 			if total <= 0 {
 				return 0

@@ -65,7 +65,7 @@
       {{end}}
     {{end}}
     <label class="mut" for="a-nasc" style="display:block; margin-top:10px">Nascimento (desempate e elegibilidade)</label>
-    <input type="text" id="a-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric" required>
+    <input type="date" id="a-nasc" name="nascimento" required>
     {{if ne ambito "local"}}
       <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
         <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem {{term "unidade"}})</label>
@@ -100,7 +100,7 @@
       {{end}}
     {{end}}
     <label class="mut" for="e-nasc" style="display:block; margin-top:10px">Nascimento</label>
-    <input type="text" id="e-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric" required>
+    <input type="date" id="e-nasc" name="nascimento" required>
     {{if ne ambito "local"}}
       <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
         <input type="checkbox" name="nato" value="1" id="e-nato" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem {{term "unidade"}})</label>
@@ -161,7 +161,7 @@
 
 {{define "importFormato"}}{{if eq ambito "local"}}Nome; Nascimento{{else if eq ambito "sinodal"}}Nome; Federação; Nascimento{{else if eq ambito "nacional"}}Nome; Sinodal; Federação; Nascimento{{else}}Nome; {{term "unidade"}}; Nascimento{{end}}{{end}}
 
-{{define "importExemplo"}}{{if eq ambito "local"}}Maria Silva; 1999-04-12&#10;João Souza; 2001-08-30{{else if eq ambito "sinodal"}}Maria Silva; Federação Oeste; 1999-04-12{{else if eq ambito "nacional"}}Maria Silva; Sinodal Sul; Federação Oeste; 1999-04-12{{else}}Maria Silva; IP Central; 1999-04-12&#10;João Souza; IP do Jardim; 2001-08-30{{end}}{{end}}
+{{define "importExemplo"}}{{if eq ambito "local"}}Maria Silva; 12/04/1999&#10;João Souza; 30/08/2001{{else if eq ambito "sinodal"}}Maria Silva; Federação Oeste; 12/04/1999{{else if eq ambito "nacional"}}Maria Silva; Sinodal Sul; Federação Oeste; 12/04/1999{{else}}Maria Silva; IP Central; 12/04/1999&#10;João Souza; IP do Jardim; 30/08/2001{{end}}{{end}}
 
 {{define "credCounts"}}
   <div class="row">

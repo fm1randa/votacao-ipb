@@ -126,15 +126,28 @@ func electorInputFrom(r *http.Request) store.ElectorInput {
 	}
 }
 
+// normalizeNascimento aceita DD/MM/AAAA (formato brasileiro, listas coladas) ou
+// AAAA-MM-DD (ISO, input type=date) e devolve sempre ISO (formato do banco).
+func normalizeNascimento(s string) (string, error) {
+	for _, layout := range []string{"2006-01-02", "02/01/2006"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Format("2006-01-02"), nil
+		}
+	}
+	return "", errors.New("nascimento obrigatório (DD/MM/AAAA)")
+}
+
 // validInput valida nome e nascimento (obrigatório — SPEC §10: desempate por
-// idade e limites de candidatura dependem dele).
-func validInput(in store.ElectorInput) error {
+// idade e limites de candidatura dependem dele) e normaliza a data para ISO.
+func validInput(in *store.ElectorInput) error {
 	if in.Nome == "" {
 		return errors.New("nome obrigatório")
 	}
-	if _, err := time.Parse("2006-01-02", in.Nascimento); err != nil {
-		return errors.New("nascimento obrigatório no formato AAAA-MM-DD")
+	nasc, err := normalizeNascimento(in.Nascimento)
+	if err != nil {
+		return err
 	}
+	in.Nascimento = nasc
 	return nil
 }
 
@@ -147,7 +160,7 @@ func (s *Server) delegadoAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in := electorInputFrom(r)
-	if err := validInput(in); err != nil {
+	if err := validInput(&in); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -195,7 +208,7 @@ func importFormat(ambito string) string {
 }
 
 // parseImport: uma linha por pessoa, campos separados por ";" conforme o âmbito.
-// Nascimento (AAAA-MM-DD) é obrigatório em todos.
+// Nascimento é obrigatório em todos (aceita DD/MM/AAAA ou AAAA-MM-DD).
 func parseImport(text, ambito string) ([]store.ElectorInput, error) {
 	want := 3 // nome; unidade; nascimento
 	switch ambito {
@@ -225,7 +238,7 @@ func parseImport(text, ambito string) ([]store.ElectorInput, error) {
 		default:
 			in.LocalNome = parts[1]
 		}
-		if err := validInput(in); err != nil {
+		if err := validInput(&in); err != nil {
 			return nil, fmt.Errorf("linha %d: %s", n+1, err)
 		}
 		out = append(out, in)
@@ -246,7 +259,7 @@ func (s *Server) delegadoUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
 	in := electorInputFrom(r)
-	if err := validInput(in); err != nil {
+	if err := validInput(&in); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
