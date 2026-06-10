@@ -85,13 +85,24 @@ adb logcat -s votacao-host:V votacao-go:V
 | Servidor morre com a tela apagada | Isenção de bateria não concedida (botão na tela) |
 | Erro `TLS segment is underaligned` no logcat | Patch do build-go.sh não rodou — recompile |
 
-## Descobertas do spike (preencher após o teste físico)
+## Descobertas do spike (teste físico em 2026-06-10)
 
-- [ ] Incógnita 1 — exec do binário do APK: **pendente de teste no aparelho**
-- [ ] Incógnita 2 — LocalOnlyHotspot + QRs: **pendente de teste no aparelho**
+- [x] **Incógnita 1 — exec do binário do APK: VALIDADA.** O Go PIE exige DOIS
+  patches ELF (ambos no `build-go.sh`):
+  1. `PT_INTERP` `/lib/ld-linux-aarch64.so.1` → `/system/bin/linker64` — sem
+     isso o exec falha com `ENOENT` *mesmo com o arquivo presente* (o "No such
+     file" é do interpretador, não do binário; no Termux quem fazia isso era o
+     `termux-elf-cleaner`);
+  2. `PT_TLS p_align` 8 → 64 (exigência do Bionic ARM64).
+  Com os dois, o servidor sobe como processo filho e responde na porta
+  (`votacao-go: votação no ar...` no logcat).
+- [x] **Incógnita 2 — LocalOnlyHotspot: VALIDADA.** SSID/senha geradas
+  (`AndroidShare_*`), interface `ap0` detectada com IPv4 (ex.
+  `10.247.171.219`) e repassada ao binário via `-host`.
+- [ ] Critério de sucesso (2º celular: QR Wi-Fi → QR URL → home): **pendente**
 - [ ] Sobrevivência ≥30 min de tela apagada: **pendente**
 - [ ] Limite de clientes simultâneos no LocalOnlyHotspot (aparelho: ____): **___ clientes**
-- Se validado: registrar a decisão de empacotamento como ADR em `docs/adr/`.
+- Se o restante validar: registrar a decisão de empacotamento como ADR em `docs/adr/`.
 
 ## Fora de escopo do spike
 
