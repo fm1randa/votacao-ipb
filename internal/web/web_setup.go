@@ -8,6 +8,7 @@ package web
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,8 +34,13 @@ func (s *Server) setupWizard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = s.st.FirstCongress(ctx)
-	if errors.Is(err, sql.ErrNoRows) { // passo 2: congresso
-		s.render(w, "setup_congresso.html", map[string]any{"AnoDefault": time.Now().Year()})
+	if errors.Is(err, sql.ErrNoRows) { // passo 2: a eleição (âmbito, sociedade, cargos)
+		s.render(w, "setup_congresso.html", map[string]any{
+			"AnoDefault": time.Now().Year(),
+			"Sociedades": store.Sociedades,
+			"Presets":    store.PresetPositions(store.AmbitoFederacao, "UMP"),
+			"Ambito":     store.AmbitoFederacao,
+		})
 		return
 	}
 	if err != nil {
@@ -53,17 +59,44 @@ func (s *Server) setupWizard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	locals, _ := s.st.Locals(ctx, cong.ID)
+	subLocals, _ := s.st.SubLocals(ctx, cong.ID)
 	s.render(w, "setup_delegados.html", map[string]any{
-		"Congresso": cong, "Electors": electors, "Locals": locals,
+		"Congresso": cong, "Electors": electors, "Locals": locals, "SubLocals": subLocals,
 	})
 }
 
-// setupCongresso cria o congresso (cargos GTSI + tokens automáticos) — passo 2.
+// setupCargosFragment re-renderiza o bloco de cargos do wizard quando a Mesa
+// troca âmbito/sociedade (hx-get) — o preset muda (SPEC §10.2).
+func (s *Server) setupCargosFragment(w http.ResponseWriter, r *http.Request) {
+	ambito, sociedade := r.URL.Query().Get("ambito"), r.URL.Query().Get("sociedade")
+	if !store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
+		http.Error(w, "âmbito ou sociedade inválidos", 400)
+		return
+	}
+	s.render(w, "cargosPreset", map[string]any{
+		"Ambito": ambito, "Presets": store.PresetPositions(ambito, sociedade),
+	})
+}
+
+// disabledRolesFrom lê os checkboxes de cargos opcionais (desmarcado = desativado).
+func disabledRolesFrom(r *http.Request, ambito, sociedade string) []string {
+	var disabled []string
+	for _, p := range store.PresetPositions(ambito, sociedade) {
+		if p.Optional && r.FormValue("cargo_"+p.Role) != "1" {
+			disabled = append(disabled, p.Role)
+		}
+	}
+	return disabled
+}
+
+// setupCongresso cria a eleição (preset de cargos + tokens automáticos) — passo 2.
 func (s *Server) setupCongresso(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	federacao := strings.TrimSpace(r.FormValue("federacao"))
+	ambito := r.FormValue("ambito")
+	sociedade := r.FormValue("sociedade")
+	nome := strings.TrimSpace(r.FormValue("nome"))
 	ano, _ := strconv.Atoi(r.FormValue("ano"))
-	if federacao == "" || ano < 2000 {
+	if nome == "" || ano < 2000 || !store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
 		http.Redirect(w, r, "/board/setup", http.StatusSeeOther)
 		return
 	}
@@ -71,14 +104,8 @@ func (s *Server) setupCongresso(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/board/setup", http.StatusSeeOther) // já existe
 		return
 	}
-	// checkbox desmarcado = cargo opcional desativado (federações menores)
-	var disabled []int
-	for _, seq := range []int{2, 3, 5} {
-		if r.FormValue("cargo"+strconv.Itoa(seq)) != "1" {
-			disabled = append(disabled, seq)
-		}
-	}
-	if _, err := s.st.SetupCongress(r.Context(), federacao, ano, disabled); err != nil {
+	if _, err := s.st.SetupCongress(r.Context(), ambito, sociedade, nome, ano,
+		disabledRolesFrom(r, ambito, sociedade)); err != nil {
 		fail(w, err)
 		return
 	}
@@ -91,14 +118,27 @@ func (s *Server) setupCongresso(w http.ResponseWriter, r *http.Request) {
 
 func electorInputFrom(r *http.Request) store.ElectorInput {
 	return store.ElectorInput{
-		Nome:       strings.TrimSpace(r.FormValue("nome")),
-		LocalNome:  strings.TrimSpace(r.FormValue("igreja")),
-		Nascimento: strings.TrimSpace(r.FormValue("nascimento")),
-		Nato:       r.FormValue("nato") == "1",
+		Nome:         strings.TrimSpace(r.FormValue("nome")),
+		LocalNome:    strings.TrimSpace(r.FormValue("igreja")),
+		SubLocalNome: strings.TrimSpace(r.FormValue("subunidade")),
+		Nascimento:   strings.TrimSpace(r.FormValue("nascimento")),
+		Nato:         r.FormValue("nato") == "1",
 	}
 }
 
-// delegadoAdd cadastra um delegado (form individual).
+// validInput valida nome e nascimento (obrigatório — SPEC §10: desempate por
+// idade e limites de candidatura dependem dele).
+func validInput(in store.ElectorInput) error {
+	if in.Nome == "" {
+		return errors.New("nome obrigatório")
+	}
+	if _, err := time.Parse("2006-01-02", in.Nascimento); err != nil {
+		return errors.New("nascimento obrigatório no formato AAAA-MM-DD")
+	}
+	return nil
+}
+
+// delegadoAdd cadastra um votante (form individual).
 func (s *Server) delegadoAdd(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cong, err := s.st.FirstCongress(ctx)
@@ -107,19 +147,19 @@ func (s *Server) delegadoAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in := electorInputFrom(r)
-	if in.Nome == "" {
-		http.Error(w, "nome obrigatório", 400)
+	if err := validInput(in); err != nil {
+		http.Error(w, err.Error(), 400)
 		return
 	}
-	err = s.st.ImportElectors(ctx, cong.ID, []store.ElectorInput{in}, "Adicionou delegado "+in.Nome)
+	err = s.st.ImportElectors(ctx, cong.ID, []store.ElectorInput{in}, "Adicionou "+in.Nome)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.credListaResp(w, r, cong.ID, "Delegado adicionado.")
+	s.credListaResp(w, r, cong.ID, s.term("Votante")+" adicionado.")
 }
 
-// delegadoImport cadastra em massa (colar lista: uma linha = "Nome; Igreja").
+// delegadoImport cadastra em massa (colar lista; formato por âmbito — SPEC §10.3).
 func (s *Server) delegadoImport(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cong, err := s.st.FirstCongress(ctx)
@@ -127,43 +167,76 @@ func (s *Server) delegadoImport(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	items := parseImport(r.FormValue("lista"))
-	if len(items) == 0 {
-		http.Error(w, "nenhuma linha válida — use \"Nome; Igreja\", um por linha", 400)
-		return
-	}
-	if err := s.st.ImportElectors(ctx, cong.ID, items,
-		"Importou "+strconv.Itoa(len(items))+" delegados"); err != nil {
+	items, err := parseImport(r.FormValue("lista"), cong.Ambito)
+	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.credListaResp(w, r, cong.ID, strconv.Itoa(len(items))+" delegados importados.")
+	if err := s.st.ImportElectors(ctx, cong.ID, items,
+		"Importou "+strconv.Itoa(len(items))+" nomes"); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.credListaResp(w, r, cong.ID, strconv.Itoa(len(items))+" nomes importados.")
 }
 
-// parseImport: uma linha = "Nome; Igreja" (ou "Nome, Igreja"); sem separador = só nome.
-func parseImport(text string) []store.ElectorInput {
+// importFormat descreve o formato de linha esperado por âmbito (SPEC §10.3).
+func importFormat(ambito string) string {
+	switch ambito {
+	case store.AmbitoLocal:
+		return "Nome; Nascimento"
+	case store.AmbitoSinodal:
+		return "Nome; Federação; Nascimento"
+	case store.AmbitoNacional:
+		return "Nome; Sinodal; Federação; Nascimento"
+	default:
+		return "Nome; UMP local; Nascimento"
+	}
+}
+
+// parseImport: uma linha por pessoa, campos separados por ";" conforme o âmbito.
+// Nascimento (AAAA-MM-DD) é obrigatório em todos.
+func parseImport(text, ambito string) ([]store.ElectorInput, error) {
+	want := 3 // nome; unidade; nascimento
+	switch ambito {
+	case store.AmbitoLocal:
+		want = 2
+	case store.AmbitoNacional:
+		want = 4
+	}
 	var out []store.ElectorInput
-	for _, line := range strings.Split(text, "\n") {
+	for n, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		nome, igreja := line, ""
-		if i := strings.Index(line, ";"); i >= 0 {
-			nome, igreja = line[:i], line[i+1:]
-		} else if i := strings.LastIndex(line, ","); i >= 0 {
-			nome, igreja = line[:i], line[i+1:]
+		parts := strings.Split(line, ";")
+		if len(parts) != want {
+			return nil, fmt.Errorf("linha %d: use \"%s\"", n+1, importFormat(ambito))
 		}
-		nome = strings.TrimSpace(nome)
-		if nome == "" {
-			continue
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
 		}
-		out = append(out, store.ElectorInput{Nome: nome, LocalNome: strings.TrimSpace(igreja)})
+		in := store.ElectorInput{Nome: parts[0], Nascimento: parts[len(parts)-1]}
+		switch ambito {
+		case store.AmbitoLocal:
+		case store.AmbitoNacional:
+			in.LocalNome, in.SubLocalNome = parts[1], parts[2]
+		default:
+			in.LocalNome = parts[1]
+		}
+		if err := validInput(in); err != nil {
+			return nil, fmt.Errorf("linha %d: %s", n+1, err)
+		}
+		out = append(out, in)
 	}
-	return out
+	if len(out) == 0 {
+		return nil, fmt.Errorf("nenhuma linha válida — use \"%s\", um por linha", importFormat(ambito))
+	}
+	return out, nil
 }
 
-// delegadoUpdate edita um delegado (modal de edição).
+// delegadoUpdate edita um votante (modal de edição).
 func (s *Server) delegadoUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cong, err := s.st.FirstCongress(ctx)
@@ -173,15 +246,15 @@ func (s *Server) delegadoUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
 	in := electorInputFrom(r)
-	if in.Nome == "" {
-		http.Error(w, "nome obrigatório", 400)
+	if err := validInput(in); err != nil {
+		http.Error(w, err.Error(), 400)
 		return
 	}
 	if err := s.st.UpdateElector(ctx, cong.ID, id, in); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.credListaResp(w, r, cong.ID, "Delegado atualizado.")
+	s.credListaResp(w, r, cong.ID, "Cadastro atualizado.")
 }
 
 // delegadoDelete remove um delegado nunca credenciado.
@@ -197,7 +270,7 @@ func (s *Server) delegadoDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.credListaResp(w, r, cong.ID, "Delegado removido.")
+	s.credListaResp(w, r, cong.ID, "Removido do rol.")
 }
 
 // credListaResp responde mutações de delegados: com htmx, devolve a lista
@@ -212,9 +285,11 @@ func (s *Server) credListaResp(w http.ResponseWriter, r *http.Request, congressI
 		}
 		q, _ := s.st.Quorum(r.Context(), congressID)
 		locals, _ := s.st.Locals(r.Context(), congressID)
+		subLocals, _ := s.st.SubLocals(r.Context(), congressID)
 		w.Header().Set("HX-Trigger", hxTrigger(map[string]any{
 			"toast": map[string]any{"msg": toast, "undo": false}, "closeModals": true}))
-		s.render(w, "credListaOOB", map[string]any{"Electors": electors, "Quorum": q, "Locals": locals})
+		s.render(w, "credListaOOB", map[string]any{
+			"Electors": electors, "Quorum": q, "Locals": locals, "SubLocals": subLocals})
 		return
 	}
 	next := r.FormValue("next")
@@ -241,6 +316,7 @@ func (s *Server) ajustes(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, "ajustes.html", map[string]any{
 		"Active": "", "Congresso": cong, "Positions": positions,
+		"Sociedades": store.Sociedades,
 	})
 }
 
@@ -259,9 +335,9 @@ func (s *Server) ajustesCargos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, p := range positions {
-		want := r.FormValue("cargo"+strconv.Itoa(p.Seq)) == "1"
-		if p.Seq != 2 && p.Seq != 3 && p.Seq != 5 {
-			continue // obrigatórios
+		want := r.FormValue("cargo_"+p.Role) == "1"
+		if !p.Optional {
+			continue // obrigatórios neste âmbito
 		}
 		// checkbox disabled (cargo em curso) não vem no form — não é intenção de desativar
 		if !want && p.Ativo && p.Status != "pendente" {
@@ -302,15 +378,29 @@ func (s *Server) ajustesSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	federacao := strings.TrimSpace(r.FormValue("federacao"))
+	ambito := r.FormValue("ambito")
+	sociedade := r.FormValue("sociedade")
+	if ambito == "" { // selects desabilitados (abertura declarada) não enviam valor
+		ambito, sociedade = cong.Ambito, cong.Sociedade
+	}
+	nome := strings.TrimSpace(r.FormValue("nome"))
 	ano, _ := strconv.Atoi(r.FormValue("ano"))
-	if federacao == "" || ano < 2000 {
-		http.Error(w, "informe federação e ano válidos", 400)
+	if nome == "" || ano < 2000 || !store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
+		http.Error(w, "informe nome, ano, âmbito e sociedade válidos", 400)
 		return
 	}
-	if err := s.st.UpdateCongress(ctx, cong.ID, federacao, ano); err != nil {
-		fail(w, err)
+	if err := s.st.UpdateCongress(ctx, cong.ID, ambito, sociedade, nome, ano); err != nil {
+		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.actionDone(w, r, "/board/ajustes", "Dados do congresso salvos.", false)
+	mudou := ambito != cong.Ambito || sociedade != cong.Sociedade
+	if mudou {
+		// O preset de cargos foi re-aplicado e a página inteira muda de vocabulário.
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Redirect", "/board/ajustes")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
+	s.actionDone(w, r, "/board/ajustes", "Dados da eleição salvos.", false)
 }

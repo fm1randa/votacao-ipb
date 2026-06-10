@@ -3,20 +3,20 @@
   <div class="brand"><img src="/assets/img/logo_ipb.png" alt="Igreja Presbiteriana do Brasil"></div>
   {{if .Setup}}
     <header style="text-align:center">
-      <p class="eyebrow">Votação de congresso</p>
+      <p class="eyebrow">Votação de diretoria</p>
       <h1>Bem-vindo</h1>
     </header>
     <div class="card" style="text-align:center">
       <p class="mut">O sistema ainda não foi configurado. A mesa define o PIN, os dados
-        do congresso e o rol de delegados em poucos passos.</p>
+        da eleição e o rol de votantes em poucos passos.</p>
       <a class="btn" href="/board/setup">Configurar agora</a>
     </div>
   {{else}}
     <header style="text-align:center">
-      <p class="eyebrow">{{.Congresso.Federacao}}</p>
-      <h1>Congresso {{.Congresso.Ano}}</h1>
+      <p class="eyebrow">{{.Congresso.Nome}}</p>
+      <h1>{{term "Evento"}} {{.Congresso.Ano}}</h1>
     </header>
-    <a class="btn" href="/delegado">Sou delegado</a>
+    <a class="btn" href="/delegado">Sou {{term "votante"}}</a>
     <a class="ghost btn" href="/board">Sou da mesa</a>
     <a class="ghost btn" href="/screen">Telão</a>
   {{end}}

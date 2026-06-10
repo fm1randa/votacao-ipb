@@ -1,22 +1,25 @@
-# Votação offline — Congresso de Federação UMP (IPB)
+# Votação offline — Diretorias de Sociedades Internas (IPB)
 
 Sistema eletrônico de votação por escrutínio para eleger a **Diretoria de uma
-Federação da UMP**, rodando **sem internet** numa LAN local (notebook da mesa +
-roteador de viagem). Binário único em Go, banco SQLite. BYOD (celular) + quiosque
-+ telão.
+Sociedade Interna da IPB** — qualquer sociedade (UMP, UPA, UPH, SAF, UCP) em
+qualquer âmbito (local, Federação, Conf. Sinodal, Conf. Nacional) — rodando
+**sem internet** numa LAN local (notebook da mesa + roteador de viagem).
+Binário único em Go, banco SQLite. BYOD (celular) + quiosque + telão.
 
 > Especificação completa em [SPEC.md](SPEC.md); glossário em [CONTEXT.md](CONTEXT.md);
-> decisões em [docs/adr/](docs/adr/). Base normativa: GTSI 2015 (Art. 26, 49–52, 91).
+> decisões em [docs/adr/](docs/adr/). Base normativa: GTSI 2015 (Art. 26, 49–52, 90–91).
 
 ## Decisões fechadas
 
 | Tema | Decisão |
 |------|---------|
-| Quem é votado | **Qualquer delegado presente** (indicação opcional, Art. 91d) |
+| Âmbitos | **Motor único** ([ADR-0009](docs/adr/0009-motor-unico-multi-ambito.md)): âmbito + sociedade são configuração do wizard (mutáveis só antes da abertura) |
+| Quem é votado | **Qualquer votante presente** (indicação opcional, Art. 91d; limites de idade no Sinodal/Nacional, Art. 4º §3–4) |
 | Maioria | **Absoluta sobre os votos depositados** — `⌊depositados/2⌋ + 1` |
-| Escrutínios | Até **3 por cargo**; o 3º é runoff entre os 2 mais votados (Art. 91e) |
-| Empate no 3º | Desempate por **maior idade** (Art. 91g) |
-| Cargos | 6, em sequência (Art. 26a): Presidente → Vice → Sec. Exec. → 1º Sec. → 2º Sec. → Tesoureiro |
+| Escrutínios | Até **3 por cargo**; o 3º é runoff entre os 2 mais votados (Art. 90e/91e) |
+| Empate no 3º | Desempate por **maior idade** (Art. 90g/91g) — nascimento é obrigatório no rol |
+| Cargos | Preset por âmbito×sociedade (Art. 13, 26): local sem Sec. Exec.; Nacional com vices regionais (5; SAF 6) |
+| Quórum | **Computado e imposto** como gate da Declaração de Abertura, sem override ([ADR-0010](docs/adr/0010-quorum-como-gate-sem-override.md)) |
 | Sigilo | `vote` referencia o votado, nunca o votante; token cego |
 | Presença | Da **pessoa**, não do token ([ADR-0002](docs/adr/0002-presenca-desacoplada-do-token.md)); reversível |
 | Telão | Só progresso enquanto aberto ([ADR-0001](docs/adr/0001-sem-placar-parcial-em-escrutinio-secreto.md)) |
@@ -39,22 +42,25 @@ go test ./...                  # testes do motor de apuração
 
 ## Fluxo do dia
 
-1. **Credenciar** cada delegado (marca presente + entrega token cego). Perda de
-   código → **Reemitir token** (não infla quórum).
-2. **Declarar quórum** (gate; painel mostra UMPs locais representadas + headcount).
-3. **Abrir escrutínio** do cargo da vez → delegados votam (celular/quiosque).
+1. **Credenciar/Chamar** cada votante (marca presente + entrega token cego).
+   Perda de código → **Reemitir token** (não infla quórum).
+2. **Declarar abertura** — o botão só habilita com o **quórum computado** do
+   âmbito (local: ½ do rol; Federação/Sinodal: ½ das unidades; Nacional: ½ das
+   Sinodais e ⅓ das Federações). Rol errado? Corrija o rol — não há override.
+3. **Abrir escrutínio** do cargo da vez → votação pelo celular/quiosque.
 4. **Encerrar** → telão mostra apuração e reconciliação. Sem eleito → próximo
    escrutínio (3º = runoff). Cargo decidido → próximo cargo.
 
 ## Modelo de dados
 
 ```
-congress ─┬─ local (UMP local; base do quórum)
-          ├─ elector (delegado: presente reversível, nato, nascimento?)
-          ├─ token (pilha cega; NÃO mede presença)
-          └─ position (cargo, seq, status) ── round (escrutínio 1..3, runoff)
-                                                 ├─ round_candidate (indicação/top-2)
-                                                 └─ vote (token, kind, votee)  ← sem votante
+congress (ambito, sociedade)
+   ├─ local (unidade de representação; nivel 0 = primária, 1 = Federação na Nacional)
+   ├─ elector (votante: presente reversível, nato, nascimento, sub_local na Nacional)
+   ├─ token (pilha cega; NÃO mede presença)
+   └─ position (cargo, role, seq, status) ── round (escrutínio 1..3, runoff)
+                                                ├─ round_candidate (indicação/top-2)
+                                                └─ vote (token, kind, votee)  ← sem votante
 ```
 
 - **Sigilo:** `vote` nunca referencia o votante; só o token cego.
@@ -66,12 +72,13 @@ congress ─┬─ local (UMP local; base do quórum)
 ```
 main.go                       flags, bootstrap, IP da LAN, PIN, seed
 internal/store/schema.sql     schema (embutido via //go:embed)
-internal/store/store.go       Open+WAL, tokens, CastVote (queima atômica)
-internal/store/electors.go    congresso, locais, rol, credenciar, presença, quórum
+internal/store/ambito.go      âmbitos, sociedades, presets de cargos, limites de idade
+internal/store/store.go       Open+WAL+migrações, tokens, CastVote (queima atômica)
+internal/store/electors.go    eleição, unidades, rol, credenciar, presença, quórum
 internal/store/positions.go   cargos, escrutínios, máquina de estados, runoff
 internal/store/tally.go       apuração: maioria, runoff, desempate por idade
 internal/store/tally_test.go  testes do motor
-internal/web/web.go           servidor, rotas, PIN, handlers do eleitor/telão
+internal/web/web.go           servidor, rotas, PIN, termos por âmbito, eleitor/telão
 internal/web/web_board.go     handlers da mesa + relatório
 internal/web/templates/       html/template embutidos
 ```
@@ -131,7 +138,8 @@ notebook. Testado na prática; a receita tem pegadinhas:
 
 O QR do telão, os logs e todos os links passam a anunciar o endereço certo.
 
-## Itens não-software (com a federação)
+## Itens não-software (com a entidade)
 Ver [SPEC.md §9](SPEC.md): aval da mesa ao voto eletrônico (há precedente — SEO/CSM
-da IPB), parâmetros do edital (representantes/locais), e coletar data de nascimento
-para automatizar o desempate por idade.
+da IPB), parâmetros do edital (representantes/unidades), coletar as datas de
+nascimento do rol antes do evento (são obrigatórias no cadastro) e, se for usar
+diretoria reduzida na Federação, validar com o Secretário Presbiterial.

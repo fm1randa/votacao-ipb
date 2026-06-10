@@ -1,4 +1,4 @@
-{{define "credenciamento.html"}}<!doctype html><html lang="pt-br"><head><title>Credenciamento — Mesa</title>{{template "styles"}}{{template "htmxjs"}}
+{{define "credenciamento.html"}}<!doctype html><html lang="pt-br"><head><title>{{term "Credenciar"}} — Mesa</title>{{template "styles"}}{{template "htmxjs"}}
 <style>
   .chips { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 4px; }
   .chip { padding:7px 14px; border-radius:999px; border:1.5px solid var(--line); background:var(--surface);
@@ -22,8 +22,8 @@
 <div class="shell">
   {{template "mesanav" .}}
   <main class="content"><div class="wrap has-bottomnav">
-    <p class="eyebrow">{{.Congresso.Federacao}}</p>
-    <h1>Credenciamento</h1>
+    <p class="eyebrow">{{.Congresso.Nome}}</p>
+    <h1>{{term "Credenciar"}}</h1>
 
     <div class="card">
       <div id="cred-counts">{{template "credCounts" .Quorum}}</div>
@@ -35,7 +35,7 @@
     </div>
 
     <div class="card">
-      <input type="search" id="busca" placeholder="buscar por nome ou igreja…">
+      <input type="search" id="busca" placeholder="buscar por nome{{if ne ambito "local"}} ou {{term "unidade"}}{{end}}…">
       <div class="chips">
         <button class="chip active" data-f="todos" type="button">Todos</button>
         <button class="chip" data-f="pendente" type="button">Pendentes</button>
@@ -52,52 +52,69 @@
 <div class="modal-backdrop" id="m-token"><div class="modal" id="token-body"></div></div>
 
 <div class="modal-backdrop" id="m-add"><div class="modal">
-  <h2>Adicionar delegado</h2>
+  <h2>Adicionar {{term "votante"}}</h2>
   <form hx-post="/board/delegados/add" hx-target="#lista-wrap" hx-swap="innerHTML">
     <label class="mut" for="a-nome">Nome</label>
     <input type="text" id="a-nome" name="nome" required>
-    <label class="mut" for="a-igreja" style="display:block; margin-top:10px">UMP local (igreja)</label>
-    <input type="text" id="a-igreja" name="igreja" list="igrejas" placeholder="criada automaticamente se nova">
-    <label class="mut" for="a-nasc" style="display:block; margin-top:10px">Nascimento (opcional — desempate por idade)</label>
-    <input type="text" id="a-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric">
-    <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
-      <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem igreja)</label>
+    {{if ne ambito "local"}}
+      <label class="mut" for="a-igreja" style="display:block; margin-top:10px">{{term "unidade"}}</label>
+      <input type="text" id="a-igreja" name="igreja" list="igrejas" placeholder="criada automaticamente se nova">
+      {{if eq ambito "nacional"}}
+        <label class="mut" for="a-sub" style="display:block; margin-top:10px">{{term "subunidade"}}</label>
+        <input type="text" id="a-sub" name="subunidade" list="subunidades" placeholder="criada automaticamente se nova">
+      {{end}}
+    {{end}}
+    <label class="mut" for="a-nasc" style="display:block; margin-top:10px">Nascimento (desempate e elegibilidade)</label>
+    <input type="text" id="a-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric" required>
+    {{if ne ambito "local"}}
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+        <input type="checkbox" name="nato" value="1" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem {{term "unidade"}})</label>
+    {{end}}
     <button type="submit">Adicionar</button>
     <button type="button" class="ghost" data-close>Cancelar</button>
   </form>
 </div></div>
 
 <div class="modal-backdrop" id="m-import"><div class="modal">
-  <h2>Colar lista de delegados</h2>
+  <h2>Colar lista</h2>
   <form hx-post="/board/delegados/import" hx-target="#lista-wrap" hx-swap="innerHTML">
-    <p class="mut">Um por linha: <code>Nome; Igreja</code></p>
-    <textarea name="lista" rows="8" placeholder="Maria Silva; IP Central&#10;João Souza; IP do Jardim"></textarea>
+    <p class="mut">Um por linha: <code>{{template "importFormato" .}}</code></p>
+    <textarea name="lista" rows="8" placeholder="{{template "importExemplo" .}}"></textarea>
     <button type="submit">Importar</button>
     <button type="button" class="ghost" data-close>Cancelar</button>
   </form>
 </div></div>
 
 <div class="modal-backdrop" id="m-edit"><div class="modal">
-  <h2>Editar delegado</h2>
+  <h2>Editar cadastro</h2>
   <form hx-post="/board/delegados/update" hx-target="#lista-wrap" hx-swap="innerHTML">
     <input type="hidden" name="elector_id" id="e-id">
     <label class="mut" for="e-nome">Nome</label>
     <input type="text" id="e-nome" name="nome" required>
-    <label class="mut" for="e-igreja" style="display:block; margin-top:10px">UMP local (igreja)</label>
-    <input type="text" id="e-igreja" name="igreja" list="igrejas">
-    <label class="mut" for="e-nasc" style="display:block; margin-top:10px">Nascimento (opcional)</label>
-    <input type="text" id="e-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric">
-    <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
-      <input type="checkbox" name="nato" value="1" id="e-nato" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem igreja)</label>
+    {{if ne ambito "local"}}
+      <label class="mut" for="e-igreja" style="display:block; margin-top:10px">{{term "unidade"}}</label>
+      <input type="text" id="e-igreja" name="igreja" list="igrejas">
+      {{if eq ambito "nacional"}}
+        <label class="mut" for="e-sub" style="display:block; margin-top:10px">{{term "subunidade"}}</label>
+        <input type="text" id="e-sub" name="subunidade" list="subunidades">
+      {{end}}
+    {{end}}
+    <label class="mut" for="e-nasc" style="display:block; margin-top:10px">Nascimento</label>
+    <input type="text" id="e-nasc" name="nascimento" placeholder="AAAA-MM-DD" inputmode="numeric" required>
+    {{if ne ambito "local"}}
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:12px">
+        <input type="checkbox" name="nato" value="1" id="e-nato" style="width:20px;height:20px;accent-color:var(--green)"> Membro nato (sem {{term "unidade"}})</label>
+    {{end}}
     <button type="submit">Salvar</button>
     <button type="button" class="danger" id="e-del"
       hx-post="/board/delegados/delete" hx-target="#lista-wrap" hx-swap="innerHTML"
-      hx-include="closest form" hx-confirm="Remover este delegado do rol?">Remover</button>
+      hx-include="closest form" hx-confirm="Remover este nome do rol?">Remover</button>
     <button type="button" class="ghost" data-close>Cancelar</button>
   </form>
 </div></div>
 
 <datalist id="igrejas">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
+<datalist id="subunidades">{{range .SubLocals}}<option value="{{.Nome}}">{{end}}</datalist>
 
 <script>
   var busca=document.getElementById('busca'), chips=Array.from(document.querySelectorAll('.chip')), filtro='todos';
@@ -126,11 +143,13 @@
     var who = e.target.closest('.cred-row .who');
     if (who) {
       var r = who.closest('.cred-row');
-      document.getElementById('e-id').value = r.dataset.id;
-      document.getElementById('e-nome').value = r.dataset.nome;
-      document.getElementById('e-igreja').value = r.dataset.nato==='1' ? '' : r.dataset.igreja;
-      document.getElementById('e-nasc').value = r.dataset.nasc || '';
-      document.getElementById('e-nato').checked = r.dataset.nato==='1';
+      var set = function(id, v){ var el = document.getElementById(id); if (el) el.value = v; };
+      set('e-id', r.dataset.id);
+      set('e-nome', r.dataset.nome);
+      set('e-igreja', r.dataset.nato==='1' ? '' : r.dataset.igreja);
+      set('e-sub', r.dataset.nato==='1' ? '' : (r.dataset.sub || ''));
+      set('e-nasc', r.dataset.nasc || '');
+      var nato = document.getElementById('e-nato'); if (nato) nato.checked = r.dataset.nato==='1';
       document.getElementById('e-del').style.display = r.dataset.status==='pendente' ? '' : 'none';
       document.getElementById('m-edit').classList.add('open');
       return;
@@ -140,10 +159,17 @@
 </script>
 </body></html>{{end}}
 
+{{define "importFormato"}}{{if eq ambito "local"}}Nome; Nascimento{{else if eq ambito "sinodal"}}Nome; Federação; Nascimento{{else if eq ambito "nacional"}}Nome; Sinodal; Federação; Nascimento{{else}}Nome; {{term "unidade"}}; Nascimento{{end}}{{end}}
+
+{{define "importExemplo"}}{{if eq ambito "local"}}Maria Silva; 1999-04-12&#10;João Souza; 2001-08-30{{else if eq ambito "sinodal"}}Maria Silva; Federação Oeste; 1999-04-12{{else if eq ambito "nacional"}}Maria Silva; Sinodal Sul; Federação Oeste; 1999-04-12{{else}}Maria Silva; IP Central; 1999-04-12&#10;João Souza; IP do Jardim; 2001-08-30{{end}}{{end}}
+
 {{define "credCounts"}}
   <div class="row">
     <div><span class="num">{{.Presentes}}</span> <span class="mut">presentes</span></div>
-    <div class="mut">credenciados {{.Credenciados}} · locais {{.LocaisRepresentadas}}/{{.LocaisTotal}}
+    <div class="mut">
+      {{if eq .Ambito "local"}}rol {{.RolTotal}}
+      {{else if eq .Ambito "nacional"}}sinodais {{.UnidadesRepr}}/{{.UnidadesTotal}} · federações {{.SubRepr}}/{{.SubTotal}}
+      {{else}}{{term "unidades"}} {{.UnidadesRepr}}/{{.UnidadesTotal}}{{end}}
       {{if gt .Reemissoes 0}}· reemissões {{.Reemissoes}}{{end}}</div>
   </div>
 {{end}}
@@ -151,13 +177,13 @@
 {{define "credLista"}}
   <div id="lista">
     {{range .Electors}}{{template "credRow" (dict "E" . "OOB" false)}}{{end}}
-    <div id="vazio">Nenhum delegado encontrado.</div>
+    <div id="vazio">Ninguém encontrado.</div>
   </div>
 {{end}}
 
 {{define "tokenPanel"}}
   <p class="eyebrow">Credencial</p>
-  <h2 style="margin-top:0">Entregue o código ao delegado</h2>
+  <h2 style="margin-top:0">Entregue o código</h2>
   <p class="big" style="text-align:center; letter-spacing:.14em">{{.}}</p>
   <p class="mut">Não anote a quem foi entregue — o sigilo depende disso.</p>
   <button type="button" class="btn" data-close>Fechar</button>
@@ -175,16 +201,17 @@
   {{template "credLista" .}}
   <div id="cred-counts" hx-swap-oob="innerHTML">{{template "credCounts" .Quorum}}</div>
   <datalist id="igrejas" hx-swap-oob="outerHTML">{{range .Locals}}<option value="{{.Nome}}">{{end}}</datalist>
+  <datalist id="subunidades" hx-swap-oob="outerHTML">{{range .SubLocals}}<option value="{{.Nome}}">{{end}}</datalist>
 {{end}}
 
 {{define "credRow"}}
 <div class="cred-row" id="cred-{{.E.ID}}" data-id="{{.E.ID}}" data-nome="{{.E.Nome}}"
-     data-igreja="{{if .E.Nato}}nato{{else}}{{.E.LocalNome}}{{end}}" data-status="{{credStatus .E}}"
+     data-igreja="{{if .E.Nato}}nato{{else}}{{.E.LocalNome}}{{end}}" data-sub="{{.E.SubLocalNome}}" data-status="{{credStatus .E}}"
      data-nato="{{if .E.Nato}}1{{else}}0{{end}}" data-nasc="{{if .E.Nascimento.Valid}}{{.E.Nascimento.String}}{{end}}"{{if .OOB}} hx-swap-oob="outerHTML"{{end}}>
-  <div class="who" title="Editar"><strong>{{.E.Nome}}</strong><br><span class="mut">{{if .E.Nato}}nato{{else}}{{.E.LocalNome}}{{end}}</span></div>
+  <div class="who" title="Editar"><strong>{{.E.Nome}}</strong>{{if ne ambito "local"}}<br><span class="mut">{{if .E.Nato}}nato{{else}}{{.E.LocalNome}}{{if .E.SubLocalNome}} · {{.E.SubLocalNome}}{{end}}{{end}}</span>{{end}}</div>
   <div style="text-align:right; flex:none">
     {{if not .E.Credenciado}}
-      <button class="sm" hx-post="/board/credenciar" hx-vals='{"elector_id": {{.E.ID}}}' hx-target="#token-body" hx-swap="innerHTML">Credenciar</button>
+      <button class="sm" hx-post="/board/credenciar" hx-vals='{"elector_id": {{.E.ID}}}' hx-target="#token-body" hx-swap="innerHTML">{{term "credenciar_btn"}}</button>
     {{else if .E.Presente}}
       <span class="pill on">presente</span>
       <button class="ghost sm" hx-post="/board/presenca" hx-vals='{"elector_id": {{.E.ID}}, "presente": 0}' hx-target="#cred-{{.E.ID}}" hx-swap="outerHTML">saída</button>

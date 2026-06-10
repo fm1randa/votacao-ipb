@@ -1,25 +1,55 @@
-# Votação de Congresso (UMP — Federação Presbiterial)
+# Votação de Diretoria (Sociedades Internas da IPB)
 
-Contexto da eleição da Diretoria de uma Federação da UMP durante o Congresso
-anual, por escrutínio secreto e offline. A linguagem segue o GTSI (Guia de
-Trabalho das Sociedades Internas da IPB).
+Contexto da eleição da Diretoria de uma Sociedade Interna da IPB — em qualquer
+Âmbito (local, Federação, Confederação Sinodal ou Nacional) — por escrutínio
+secreto e offline. A linguagem segue o GTSI (Guia de Trabalho das Sociedades
+Internas da IPB).
 
 ## Language
 
+**Âmbito**:
+O nível da entidade cuja Diretoria se elege: Local, Federação, Confederação
+Sinodal ou Confederação Nacional. Define quem vota (Sócio vs. Delegado), o
+Evento (Plenária vs. Congresso), a base do Quórum e os Cargos.
+_Avoid_: Nível, instância (use o termo único Âmbito).
+
+**Sociedade Interna**:
+Uma das cinco sociedades do GTSI: UMP, UPA, UPH, SAF ou UCP. Define os rótulos
+dos Cargos (gênero: "Tesoureira" na SAF) e o nº de Vices da Nacional.
+_Avoid_: Departamento, ministério.
+
 **Congresso**:
-A assembleia anual da Federação onde se elege a Diretoria.
+A assembleia dos Âmbitos federados (Federação anual, Sinodal bienal, Nacional
+quadrienal) onde se elege a Diretoria. No Âmbito local, o evento é a **Plenária**.
 _Avoid_: Assembleia, sessão (são partes do Congresso, não o todo).
 
+**Plenária**:
+A reunião dos Sócios de uma sociedade local; a eleição ocorre em Plenária
+extraordinária convocada para esse fim (Art. 90a). Equivalente local do Congresso.
+
 **Federação**:
-A união das UMPs locais de um Presbitério; o corpo cuja Diretoria se elege.
+A união das sociedades locais de um Presbitério. Nos Congressos Sinodais, é a
+unidade de representação.
 
 **UMP Local**:
-A sociedade de mocidade de uma igreja local. Base da representação para quórum.
+A sociedade de mocidade de uma igreja local. Base da representação para quórum
+no Congresso da Federação.
 _Avoid_: Sociedade (ambíguo — pode ser local ou interna em geral).
 
 **Delegado**:
-Pessoa com direito a voto no Congresso, uma vez credenciada.
+Pessoa com direito a voto num Congresso (Âmbitos federados), uma vez credenciada.
+No Âmbito local não há Delegados — quem vota é o **Sócio Ativo**.
 _Avoid_: Eleitor, sócio, votante, membro (todos mais amplos que Delegado).
+
+**Sócio Ativo**:
+Membro da igreja local arrolado na sociedade interna. Na Plenária local, só
+Sócios Ativos presentes votam e são votados (Art. 6º § único, Art. 90b–c).
+_Avoid_: Membro, comungante (o termo do GTSI é sócio ativo).
+
+**Chamada**:
+O equivalente local do Credenciamento: a Mesa marca o Sócio como presente e
+entrega-lhe um Token (Art. 86 — vota quem respondeu à chamada). Sem credencial
+e sem UMP de origem.
 
 **Mesa**:
 O grupo que dirige e opera o Congresso (e o sistema): credencia, abre/encerra
@@ -28,7 +58,8 @@ _Avoid_: Administração, diretoria (a Diretoria é o que se elege, não quem op
 
 **Credenciamento**:
 O ato de marcar um Delegado como presente (Presença) e entregar-lhe um Token. No
-GTSI: "Verificação de Poderes".
+GTSI: "Verificação de Poderes". Só existe nos Âmbitos federados; no local, o
+equivalente é a **Chamada**.
 _Avoid_: Check-in, login.
 
 **Presença**:
@@ -42,10 +73,13 @@ identificar o Delegado que o emitiu. Um por Delegado, válido todo o Congresso.
 _Avoid_: Senha, cédula (a cédula é o ato de votar; o Token é a chave anônima).
 
 **Cargo**:
-Um posto eletivo da Diretoria (Presidente, Vice, etc.). Eleito isoladamente.
-Federações menores podem desativar Vice-presidente, Secretário Executivo e
-2º Secretário; sem o 2º, o 1º Secretário exibe-se apenas como "Secretário".
-_Avoid_: Eleição (a Eleição é do Congresso inteiro; um posto isolado é um Cargo).
+Um posto eletivo da Diretoria, eleito isoladamente. O preset vem do Âmbito +
+Sociedade: Local sem Secretário Executivo, com redução expressa a
+Presidente/Secretário/Tesoureiro (Art. 13); Federação/Sinodal completos
+(Art. 26a); Nacional com Vice-presidentes regionais como cargos separados
+(5; 6 na SAF — Art. 26b), sem validar a região do candidato. Sem o 2º
+Secretário, o 1º exibe-se apenas como "Secretário".
+_Avoid_: Eleição (a Eleição é do evento inteiro; um posto isolado é um Cargo).
 
 **Escrutínio**:
 Uma rodada de votação secreta para um único Cargo. Há até 3 por Cargo.
@@ -63,16 +97,27 @@ parte do Branco.
 
 **Nato**:
 Delegado que é membro por ofício (Diretoria atual e Secretários de Atividades) —
-vota, mas não apresenta credencial e não representa uma UMP Local.
+vota, mas não apresenta credencial e não representa uma unidade. Só existe nos
+Âmbitos federados (Art. 52); na Plenária local todos são Sócios comuns.
 _Avoid_: Ex-officio (use o termo do GTSI, "nato").
 
 **Quórum**:
-A presença mínima para o Congresso funcionar: mais da metade das UMPs Locais.
-Conta Locais representadas, não pessoas — Natos não somam ao denominador.
+A presença mínima para o evento funcionar, computada pelo sistema conforme o
+Âmbito: Local — mais da metade dos Sócios Ativos do rol; Federação — mais da
+metade das UMPs Locais; Sinodal — mais da metade das Federações; Nacional —
+mais da metade das Sinodais e ao menos 1/3 das Federações (Art. 12 §2º, 49).
+Nos âmbitos federados conta unidades representadas, não pessoas — Natos não
+somam ao denominador.
+
+**Declaração de Abertura**:
+O ato da Mesa que inicia a eleição (Art. 56c). Só habilita com Quórum computado
+atingido; depois dela, Escrutínios abrem sem nova exigência (a contagem segue
+visível). Não há override — rol incorreto corrige-se editando o rol.
 
 **Indicação**:
 Nome proposto pelo Plenário para um Cargo (opcional). Sem Indicação, qualquer
-Delegado credenciado pode receber Votos.
+Delegado credenciado pode receber Votos. Só prevista nos Âmbitos federados
+(Art. 91d); o Art. 90 não a contempla na Plenária local.
 _Avoid_: Candidatura, chapa (não há chapas; a unidade é o Cargo).
 
 **Operação**:
@@ -101,7 +146,9 @@ de brancos, nulos e abstenções.
 - Um **Cargo** é decidido por um a três **Escrutínios** (o 3º entre os dois mais votados).
 - Um **Delegado** recebe um **Token** no **Credenciamento** e emite um **Voto** por **Escrutínio**.
 - Um **Voto** referencia o **Delegado votado** (público), nunca o votante (sigilo).
-- O **Quórum** mede-se por **UMPs Locais** representadas.
+- O **Quórum** mede-se por unidades representadas conforme o **Âmbito**: Sócios
+  Ativos (Local), UMPs Locais (Federação), Federações (Sinodal), Sinodais +
+  Federações (Nacional).
 
 ## Example dialogue
 

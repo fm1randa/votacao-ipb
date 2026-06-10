@@ -1,9 +1,10 @@
-# Especificação — Votação eletrônica de Congresso (UMP, Federação Presbiterial)
+# Especificação — Votação eletrônica de Diretoria (Sociedades Internas da IPB)
 
-Sistema offline para eleger a **Diretoria de uma Federação da UMP** durante o
-Congresso anual, substituindo o escrutínio em papel. Base normativa: **GTSI –
-Guia de Trabalho das Sociedades Internas da IPB (2015)**, Regimento Interno
-(Art. 25–33) e **Específica UMP (Art. 26, 49–52, 90–91)**.
+Sistema offline para eleger a **Diretoria de uma Sociedade Interna da IPB** —
+em qualquer âmbito (local, Federação, Confederação Sinodal ou Nacional) —
+substituindo o escrutínio em papel. Base normativa: **GTSI – Guia de Trabalho
+das Sociedades Internas da IPB (2015)**, Regimento Interno (Art. 25–33) e
+**Específica UMP (Art. 26, 49–52, 90–91)**. Ver §10 para o modelo multi-âmbito.
 
 > Citações `(Art. N)` referem-se ao GTSI. **[decisão]** marca escolhas do projeto.
 
@@ -11,7 +12,9 @@ Guia de Trabalho das Sociedades Internas da IPB (2015)**, Regimento Interno
 
 ## 1. Contexto e escopo
 
-- **Evento:** Congresso anual de uma Federação UMP (nível presbiterial).
+- **Evento:** a eleição da Diretoria de uma sociedade interna, no âmbito
+  configurado (§10): Plenária extraordinária (local, Art. 90a) ou Congresso
+  (Federação anual, Sinodal bienal, Nacional quadrienal — Art. 46).
 - **Objetivo:** eleger a Diretoria, **cargo por cargo**, por escrutínio secreto.
 - **Escopo [decisão]:** **somente a eleição da diretoria.** Votação de matérias
   (maioria dos presentes, Art. 31) fica fora — segue presencial.
@@ -37,9 +40,13 @@ Guia de Trabalho das Sociedades Internas da IPB (2015)**, Regimento Interno
 - **Indicação (Art. 91d) é OPCIONAL [decisão]:** a mesa *pode* registrar uma
   short-list de indicados por cargo pra focar a votação, mas no congresso pequeno
   isso quase nunca ocorre. Sem indicação → cédula lista todos os delegados.
-- **Elegibilidade [decisão]:** o GTSI exige candidato membro da IPB +1 ano
-  (Art. 91c) e sócio ativo +1 ano (Art. 25 PU), **mas o software NÃO verifica
-  isso** — responsabilidade 100% humana (Comissão de Diplomacia).
+- **Elegibilidade [decisão, revista 2026-06-10]:** o GTSI exige candidato membro
+  da IPB +1 ano (Art. 91c) e sócio ativo +1 ano (Art. 25 PU) — **sem verificação
+  pelo software** (responsabilidade da Comissão de Diplomacia). Exceção: os
+  **limites de idade para concorrer** (Parte Comum Art. 4º §3–4 — UMP: ≤33 no
+  Sinodal, ≤32 no Nacional; UPA: 17/16) **são aplicados** — com nascimento
+  obrigatório no rol (§10), quem excede o limite sai da lista de votáveis do
+  âmbito (mesmo mecanismo do "eleito não concorre"), mas segue votando.
 - **Eleito não concorre a outro cargo:** quem já foi eleito num cargo decidido sai
   da cédula dos cargos seguintes e o servidor recusa votos nele (não se acumulam
   cargos na diretoria). Desfazer a eleição de um cargo devolve a pessoa à cédula.
@@ -57,10 +64,13 @@ Guia de Trabalho das Sociedades Internas da IPB (2015)**, Regimento Interno
   convocação para eleições (o de 1/3 vale só para reuniões ordinárias).
 - **Art. 49a:** o quórum do Congresso da Federação é **"mais da metade das UMPs
   locais"** — medido por **representação de sociedades locais**, não por cabeça.
-- **No sistema [decisão]:** painel da mesa **mostra os dois** — (i) UMPs locais
-  representadas (≥1 delegado presente) sobre total de locais, e (ii) headcount de
-  delegados presentes. A **mesa declara** o quórum oficial pelas locais. Sem
-  quórum declarado, não se abre escrutínio (gate).
+- **No sistema [decisão, revista 2026-06-10]:** o quórum é **computado pelo
+  sistema conforme o âmbito** (§10) e funciona como **gate automático da
+  Declaração de Abertura** (Art. 56c): o botão "Declarar abertura" só habilita
+  com o quórum atingido. **Sem override** — se o denominador está errado, a Mesa
+  corrige o rol (ação registrada no Histórico). Depois da abertura, escrutínios
+  abrem sem nova exigência; o painel segue mostrando a contagem ao vivo (unidades
+  representadas + headcount de presentes).
 
 ### 3.4 Eleição da Diretoria (Art. 91 — regra UMP específica)
 - **(a)** Escrutínio **secreto** por cédula durante o Congresso (Art. 29c torna o
@@ -220,8 +230,9 @@ offline, confiança > impacto).
 - **Primeira configuração: wizard de 3 passos** — (1) PIN da Mesa, (2) Congresso
   (federação + ano; os **6 cargos do GTSI** e a pilha de tokens são criados
   automaticamente), (3) Delegados (com "concluir depois").
-- **Cadastro do rol:** form individual (nome, igreja, nascimento opcional, nato) **e**
-  colar lista (uma linha = `Nome; Igreja`; igrejas inexistentes são criadas).
+- **Cadastro do rol:** form individual (nome, igreja, **nascimento obrigatório**
+  — §10, nato) **e** colar lista (formato por âmbito, §10.3; igrejas/unidades
+  inexistentes são criadas).
 - **Depois do setup:** delegados são geridos **dentro da aba Credenciar** (adicionar,
   colar lista, editar; remover só quem nunca foi credenciado); federação/ano numa tela
   **Ajustes** (engrenagem no topo da aba Escrutínio). Tudo passa pelo log de operações.
@@ -240,7 +251,6 @@ offline, confiança > impacto).
 ## 8. Fora de escopo
 - Votação de matérias/propostas/relatórios (Art. 31).
 - Posse e atos litúrgicos (Art. 91h).
-- Outros níveis (Sinodal/Nacional) e outras sociedades.
 
 ## 9. Itens em aberto (não-software)
 1. **Aval da mesa ao voto eletrônico** (formalidade, não bloqueio). Há
@@ -255,8 +265,60 @@ offline, confiança > impacto).
    Ref.: https://www.executivaipb.com.br/seo/
 2. **Parâmetros do edital:** nº de representantes por UMP local (Art. 50a) e a
    lista de UMPs locais federadas (base do quórum) — dados a carregar no rol.
-3. **Coletar data de nascimento** dos delegados para automatizar o desempate por
-   idade (Art. 91g), ou deixar o desempate manual na mesa?
+3. **Coletar data de nascimento** dos delegados — **resolvido em software**
+   (2026-06-10): nascimento é **obrigatório** no rol (§10); resta à mesa coletar
+   as datas antes do evento.
 4. **Diretoria reduzida na Federação:** o Art. 26a prevê a diretoria completa, sem
    cláusula de mínimo (a redução expressa é só da sociedade local, Art. 13). Se a
    federação for usar menos cargos (§3.5), validar com o Secretário Presbiterial.
+
+## 10. Multi-âmbito e multi-sociedade (grilling 2026-06-10)
+
+O sistema atende **qualquer sociedade interna** (UMP, UPA, UPH, SAF, UCP) em
+**qualquer âmbito** (Local, Federação, Confederação Sinodal, Confederação
+Nacional). A mecânica de eleição é idêntica em todos (Art. 90 ≡ Art. 91 d–g:
+voto secreto, cargo a cargo, 3 escrutínios, maioria, desempate por idade); o
+que varia é configuração e vocabulário.
+
+### 10.1 Configuração inicial [decisão]
+- O wizard ganha **dois seletores**: **âmbito** e **sociedade**. A sociedade
+  define os rótulos dos cargos (gênero — SAF: "Secretária Executiva",
+  "Tesoureira") e o preset de vices da Nacional; o âmbito define o resto.
+- **Mutável só antes da Declaração de Abertura** (logo, sem votos): a troca em
+  Ajustes re-aplica o preset de cargos com modal de confirmação e entra no
+  Histórico (restaurável). Depois da abertura, bloqueado.
+- **Migração:** bancos existentes assumem `ambito=federacao`, `sociedade=UMP`.
+
+### 10.2 O que varia por âmbito
+| Aspecto | Local | Federação | Conf. Sinodal | Conf. Nacional |
+|---|---|---|---|---|
+| Evento | Plenária (Art. 90a) | Congresso anual | Congresso bienal | Congresso quadrienal |
+| Quem vota | Sócio Ativo presente | Delegado credenciado | idem | idem |
+| Termo na UI | "Sócio", "Chamada" | "Delegado", "Credenciar" | idem | idem |
+| Unidade de representação | — (pessoas) | UMP local | Federação | Sinodal **+ Federação** |
+| Quórum (Art. 12 §2º, 49) | > ½ dos sócios ativos do rol | > ½ das UMPs locais | > ½ das Federações | > ½ das Sinodais **e** ≥ ⅓ das Federações |
+| Cargos (preset) | Pres, Vice, 1º Sec, 2º Sec, Tes (sem Sec. Exec; redução **expressa** a Pres/Sec/Tes — Art. 13) | Art. 26a completo | = Federação | Pres, **vices regionais** (5; SAF 6), Sec. Exec, 1º+2º Sec, Tes |
+| Natos (Art. 52) | não há | sim | sim | sim |
+| Indicação (Art. 91d) | não prevista (Art. 90 omite) | opcional | opcional | opcional |
+| Limite de idade p/ concorrer | — | — | UMP ≤33, UPA ≤17 | UMP ≤32, UPA ≤16 |
+
+### 10.3 Decisões de mecânica
+- **Quórum computado como gate [decisão]:** ver §3.3 — "Declarar abertura" só
+  habilita com quórum atingido; sem override; rol é a fonte da verdade.
+- **Nacional com hierarquia completa:** o rol nacional registra **Sinodal e
+  Federação** de cada delegado; o sistema computa os dois critérios do Art. 49c.
+- **Vices regionais são cargos separados** ("Vice-presidente Norte", …), cada um
+  com seus escrutínios. O sistema **não valida** a região do candidato (o GTSI
+  só diz "representando").
+- **Nascimento obrigatório** no rol (desempate Art. 90g/91g + limites de idade).
+  A flag de "empate não resolvido" por nascimento ausente deixa de existir para
+  cadastros novos.
+- **Âmbito local:** sem credenciamento (a aba vira **Chamada**: marcar presente
+  + entregar token — Art. 86), sem UMP de origem, sem natos, sem indicação. O
+  token cego continua sendo a credencial de voto (sigilo BYOD). O rol importado
+  deve ser o rol **completo** de sócios ativos — ele é o denominador do quórum.
+- **Importação por âmbito:** Local `Nome; Nascimento` · Federação `Nome; UMP;
+  Nascimento` · Sinodal `Nome; Federação; Nascimento` · Nacional `Nome; Sinodal;
+  Federação; Nascimento`.
+- **Checagens sem dado seguem manuais:** "membro da IPB há +1 ano" (Art. 91c) e
+  afins continuam com a Comissão de Diplomacia.

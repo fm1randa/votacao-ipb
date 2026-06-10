@@ -92,18 +92,18 @@ func main() {
 	httpSrv.Shutdown(ctx)
 }
 
-// semear cria um congresso de exemplo: UMPs locais, delegados, os 6 cargos da
-// Diretoria da Federação UMP (Art. 26a) e a pilha de tokens.
+// semear cria um congresso de exemplo (âmbito Federação/UMP): UMPs locais,
+// delegados, o preset de cargos (Art. 26a) e a pilha de tokens.
 func semear(st *store.Store, n int) error {
 	ctx := context.Background()
-	cong, err := st.CreateCongress(ctx, "Federação UMP de Exemplo", 2026)
+	cong, err := st.CreateCongress(ctx, store.AmbitoFederacao, "UMP", "Federação UMP de Exemplo", 2026)
 	if err != nil {
 		return err
 	}
 
 	locais := map[string]int64{}
 	for _, nome := range []string{"1ª IP Central", "IP do Jardim", "IP Betel"} {
-		id, err := st.AddLocal(ctx, cong, nome)
+		id, err := st.AddLocal(ctx, cong, nome, 0)
 		if err != nil {
 			return err
 		}
@@ -128,15 +128,13 @@ func semear(st *store.Store, n int) error {
 			id := locais[d.local]
 			localID = &id
 		}
-		if _, err := st.AddElector(ctx, cong, d.nome, localID, d.nato, d.nasc); err != nil {
+		if _, err := st.AddElector(ctx, cong, d.nome, localID, nil, d.nato, d.nasc); err != nil {
 			return err
 		}
 	}
 
-	cargos := []string{"Presidente", "Vice-presidente", "Secretário Executivo",
-		"1º Secretário", "2º Secretário", "Tesoureiro"}
-	for i, nome := range cargos {
-		if err := st.AddPosition(ctx, cong, nome, i+1); err != nil {
+	for i, p := range store.PresetPositions(store.AmbitoFederacao, "UMP") {
+		if err := st.AddPosition(ctx, cong, p.Nome, p.Role, i+1); err != nil {
 			return err
 		}
 	}

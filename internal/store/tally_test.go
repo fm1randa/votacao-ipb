@@ -95,15 +95,15 @@ func setup(t *testing.T) *cenario {
 	}
 	t.Cleanup(func() { st.Close() })
 
-	cong, err := st.CreateCongress(ctx, "Federação Teste", 2026)
+	cong, err := st.CreateCongress(ctx, AmbitoFederacao, "UMP", "Federação Teste", 2026)
 	if err != nil {
 		t.Fatal(err)
 	}
-	loc, _ := st.AddLocal(ctx, cong, "IP Central")
+	loc, _ := st.AddLocal(ctx, cong, "IP Central", 0)
 	if err := st.GenerateTokens(ctx, cong, 20); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.AddPosition(ctx, cong, "Presidente", 1); err != nil {
+	if err := st.AddPosition(ctx, cong, "Presidente", RolePresidente, 1); err != nil {
 		t.Fatal(err)
 	}
 	poss, _ := st.Positions(ctx, cong)
@@ -115,7 +115,7 @@ func setup(t *testing.T) *cenario {
 		{"Ana", "1985-01-01"}, {"Bruno", "1990-01-01"},
 		{"Caio", "1995-01-01"}, {"Davi", "2000-01-01"},
 	} {
-		id, err := st.AddElector(ctx, cong, d.nome, &loc, false, d.nasc)
+		id, err := st.AddElector(ctx, cong, d.nome, &loc, nil, false, d.nasc)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -126,7 +126,7 @@ func setup(t *testing.T) *cenario {
 		}
 		c.tokens[d.nome] = tok
 	}
-	if err := st.DeclararQuorum(ctx, cong); err != nil {
+	if err := st.DeclararAbertura(ctx, cong); err != nil {
 		t.Fatal(err)
 	}
 	return c
@@ -204,7 +204,7 @@ func TestFluxoCompleto_CargoDecidido(t *testing.T) {
 func TestEleitoNaoConcorreAOutroCargo(t *testing.T) {
 	ctx := context.Background()
 	c := setup(t)
-	must(t, c.st.AddPosition(ctx, c.cong, "Vice-presidente", 2))
+	must(t, c.st.AddPosition(ctx, c.cong, "Vice-presidente", RoleVice, 2))
 
 	// Elege Ana para Presidente (4 votos de 4).
 	round, _ := c.st.AbrirCargo(ctx, c.cong, c.pos, nil)
@@ -247,7 +247,8 @@ func TestCargosConfiguraveis(t *testing.T) {
 	t.Cleanup(func() { st.Close() })
 
 	// Setup com Vice e 2º Secretário desativados (federação menor).
-	cong, err := st.SetupCongress(ctx, "Fed Pequena", 2026, []int{2, 5})
+	cong, err := st.SetupCongress(ctx, AmbitoFederacao, "UMP", "Fed Pequena", 2026,
+		[]string{RoleVice, RoleSegundoSec})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,10 +293,15 @@ func TestCargosConfiguraveis(t *testing.T) {
 	if !nomes["1º Secretário"] || !nomes["2º Secretário"] {
 		t.Fatalf("com o 2º reativado, esperava 1º e 2º Secretário; veio %v", nomes)
 	}
-	// Abrir escrutínio de cargo desativado (Vice, seq 2) é recusado.
-	st.DeclararQuorum(ctx, cong)
+	// Abrir escrutínio de cargo desativado (Vice) é recusado mesmo com abertura.
+	loc, _ := st.AddLocal(ctx, cong, "IP Única", 0)
+	id, _ := st.AddElector(ctx, cong, "Zé", &loc, nil, false, "1999-01-01")
+	if _, err := st.Credenciar(ctx, cong, id); err != nil {
+		t.Fatal(err)
+	}
+	must(t, st.DeclararAbertura(ctx, cong))
 	for _, p := range all {
-		if p.Seq == 2 {
+		if p.Role == RoleVice {
 			if _, err := st.AbrirCargo(ctx, cong, p.ID, nil); err == nil {
 				t.Fatal("abrir escrutínio de cargo desativado deveria falhar")
 			}
@@ -303,16 +309,192 @@ func TestCargosConfiguraveis(t *testing.T) {
 	}
 }
 
-func TestAbrirCargo_ExigeQuorumDeclarado(t *testing.T) {
+func TestAbrirCargo_ExigeAberturaDeclarada(t *testing.T) {
 	ctx := context.Background()
 	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
 	t.Cleanup(func() { st.Close() })
-	cong, _ := st.CreateCongress(ctx, "F", 2026)
-	st.AddPosition(ctx, cong, "Presidente", 1)
+	cong, _ := st.CreateCongress(ctx, AmbitoFederacao, "UMP", "F", 2026)
+	st.AddPosition(ctx, cong, "Presidente", RolePresidente, 1)
 	poss, _ := st.Positions(ctx, cong)
 	if _, err := st.AbrirCargo(ctx, cong, poss[0].ID, nil); err == nil {
-		t.Fatal("deveria recusar abrir cargo sem quórum declarado")
+		t.Fatal("deveria recusar abrir cargo sem abertura declarada")
 	}
+}
+
+func TestDeclararAbertura_ExigeQuorumComputado(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	// Federação com 3 UMPs e 1 só representada → 1/3 não é mais da metade.
+	cong, _ := st.SetupCongress(ctx, AmbitoFederacao, "UMP", "F", 2026, nil)
+	var locs []int64
+	for _, nome := range []string{"A", "B", "C"} {
+		id, _ := st.AddLocal(ctx, cong, nome, 0)
+		locs = append(locs, id)
+	}
+	e1, _ := st.AddElector(ctx, cong, "Um", &locs[0], nil, false, "1999-01-01")
+	if _, err := st.Credenciar(ctx, cong, e1); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeclararAbertura(ctx, cong); err == nil {
+		t.Fatal("sem quórum, declarar abertura deveria falhar (ADR-0010)")
+	}
+	// Representa a 2ª UMP → 2/3 é mais da metade → declara.
+	e2, _ := st.AddElector(ctx, cong, "Dois", &locs[1], nil, false, "1998-01-01")
+	if _, err := st.Credenciar(ctx, cong, e2); err != nil {
+		t.Fatal(err)
+	}
+	must(t, st.DeclararAbertura(ctx, cong))
+}
+
+func TestQuorumLocal_MetadeDoRol(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	// UMP local com 4 sócios no rol: 2 presentes não bastam; 3 sim.
+	cong, _ := st.SetupCongress(ctx, AmbitoLocal, "UMP", "UMP da IP Central", 2026, nil)
+	var ids []int64
+	for _, nome := range []string{"A", "B", "C", "D"} {
+		id, _ := st.AddElector(ctx, cong, nome, nil, nil, false, "1999-01-01")
+		ids = append(ids, id)
+	}
+	for _, id := range ids[:2] {
+		if _, err := st.Credenciar(ctx, cong, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if q, _ := st.Quorum(ctx, cong); q.Ok {
+		t.Fatalf("2/4 do rol não é mais da metade: %+v", q)
+	}
+	if _, err := st.Credenciar(ctx, cong, ids[2]); err != nil {
+		t.Fatal(err)
+	}
+	q, _ := st.Quorum(ctx, cong)
+	if !q.Ok || q.RolTotal != 4 || q.Presentes != 3 {
+		t.Fatalf("3/4 do rol deveria dar quórum: %+v", q)
+	}
+	must(t, st.DeclararAbertura(ctx, cong))
+}
+
+func TestQuorumNacional_Composto(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	// Nacional: 2 Sinodais (precisa 2 repr.) e 6 Federações (precisa ≥2 repr.).
+	cong, _ := st.SetupCongress(ctx, AmbitoNacional, "UMP", "Confederação Nacional", 2026, nil)
+	sin1, _ := st.AddLocal(ctx, cong, "Sinodal Sul", 0)
+	sin2, _ := st.AddLocal(ctx, cong, "Sinodal Norte", 0)
+	var feds []int64
+	for _, nome := range []string{"F1", "F2", "F3", "F4", "F5", "F6"} {
+		id, _ := st.AddLocal(ctx, cong, nome, 1)
+		feds = append(feds, id)
+	}
+	add := func(nome string, sin, fed int64) int64 {
+		id, err := st.AddElector(ctx, cong, nome, &sin, &fed, false, "1999-01-01")
+		must(t, err)
+		_, err = st.Credenciar(ctx, cong, id)
+		must(t, err)
+		return id
+	}
+	// 2 sinodais representadas mas só 1 federação (1/6 < 1/3) → sem quórum.
+	add("A", sin1, feds[0])
+	add("B", sin2, feds[0])
+	if q, _ := st.Quorum(ctx, cong); q.Ok {
+		t.Fatalf("1/6 federações não atinge 1/3: %+v", q)
+	}
+	// 2ª federação representada (2/6 = 1/3) → quórum.
+	add("C", sin1, feds[1])
+	q, _ := st.Quorum(ctx, cong)
+	if !q.Ok || q.UnidadesRepr != 2 || q.SubRepr != 2 {
+		t.Fatalf("2/2 sinodais + 2/6 federações deveria dar quórum: %+v", q)
+	}
+}
+
+func TestIdadeMaxima_BloqueiaCandidaturaNaoOVoto(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	// Sinodal UMP: limite 33 anos para SER votado (Art. 4º §4).
+	cong, _ := st.SetupCongress(ctx, AmbitoSinodal, "UMP", "Sinodal Teste", 2026, nil)
+	fed, _ := st.AddLocal(ctx, cong, "Federação Única", 0)
+	velho, _ := st.AddElector(ctx, cong, "Veterano", &fed, nil, false, "1980-01-01") // 46 anos
+	jovem, _ := st.AddElector(ctx, cong, "Jovem", &fed, nil, false, "2000-01-01")    // 26 anos
+	tokVelho, err := st.Credenciar(ctx, cong, velho)
+	must(t, err)
+	_, err = st.Credenciar(ctx, cong, jovem)
+	must(t, err)
+	must(t, st.DeclararAbertura(ctx, cong))
+
+	poss, _ := st.Positions(ctx, cong)
+	round, err := st.AbrirCargo(ctx, cong, poss[0].ID, nil)
+	must(t, err)
+	votaveis, _ := st.VotableElectors(ctx, round.ID)
+	for _, e := range votaveis {
+		if e.ID == velho {
+			t.Fatal("quem excede 33 anos não deveria estar na cédula do Sinodal")
+		}
+	}
+	if err := st.CastVote(ctx, round.ID, tokVelho, "candidato", velho); err != ErrInvalidVotee {
+		t.Fatalf("voto em quem excede a idade deveria ser recusado, veio %v", err)
+	}
+	// O veterano VOTA normalmente (limite é só para ser votado).
+	must(t, st.CastVote(ctx, round.ID, tokVelho, "candidato", jovem))
+}
+
+func TestPresets_LocalENacional(t *testing.T) {
+	local := PresetPositions(AmbitoLocal, "UMP")
+	if len(local) != 5 {
+		t.Fatalf("local UMP deveria ter 5 cargos, veio %d", len(local))
+	}
+	for _, p := range local {
+		if p.Role == RoleSecExec {
+			t.Fatal("local não tem Secretário Executivo (Art. 13)")
+		}
+	}
+	nac := PresetPositions(AmbitoNacional, "UMP")
+	if len(nac) != 10 { // Pres + 5 vices + SecExec + 2 Secs + Tes
+		t.Fatalf("nacional UMP deveria ter 10 cargos, veio %d", len(nac))
+	}
+	nacSAF := PresetPositions(AmbitoNacional, "SAF")
+	if len(nacSAF) != 11 { // SAF: 6 vices (Sudeste Norte/Sul)
+		t.Fatalf("nacional SAF deveria ter 11 cargos, veio %d", len(nacSAF))
+	}
+	temTesoureira := false
+	for _, p := range nacSAF {
+		if p.Nome == "Tesoureira" {
+			temTesoureira = true
+		}
+		if p.Optional {
+			t.Fatal("nacional é prescritivo — nenhum cargo opcional (Art. 26b)")
+		}
+	}
+	if !temTesoureira {
+		t.Fatal("SAF usa títulos femininos (Tesoureira)")
+	}
+}
+
+func TestMudarAmbito_SoAntesDaAbertura(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	cong, _ := st.SetupCongress(ctx, AmbitoFederacao, "UMP", "F", 2026, nil)
+	// Antes da abertura: muda pra local e o preset é re-aplicado (5 cargos, sem SecExec).
+	must(t, st.UpdateCongress(ctx, cong, AmbitoLocal, "UMP", "UMP da IP Central", 2026))
+	all, _ := st.AllPositions(ctx, cong)
+	if len(all) != 5 {
+		t.Fatalf("após trocar pra local, esperava 5 cargos, veio %d", len(all))
+	}
+	// Declara abertura (1 sócio de rol 1 = mais da metade) e tenta trocar de novo.
+	id, _ := st.AddElector(ctx, cong, "Zé", nil, nil, false, "1999-01-01")
+	if _, err := st.Credenciar(ctx, cong, id); err != nil {
+		t.Fatal(err)
+	}
+	must(t, st.DeclararAbertura(ctx, cong))
+	if err := st.UpdateCongress(ctx, cong, AmbitoSinodal, "UMP", "X", 2026); err == nil {
+		t.Fatal("trocar âmbito após a abertura deveria falhar")
+	}
+	// Nome/ano seguem editáveis sem trocar âmbito.
+	must(t, st.UpdateCongress(ctx, cong, AmbitoLocal, "UMP", "UMP Central", 2027))
 }
 
 func TestOperationLog_ReiniciarEDesfazer(t *testing.T) {

@@ -4,26 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 type Position struct {
 	ID         int64
 	Nome       string
+	Role       string // papel no preset (presidente, vice, ... — ambito.go)
 	Seq        int
 	Ativo      bool
+	Optional   bool   // desativável neste âmbito (derivado do preset)
 	Status     string // pendente | em_eleicao | decidido
 	EleitoID   sql.NullInt64
 	EleitoNome string
 }
-
-// Cargos que federações menores podem desabilitar (SPEC §3.5); os demais são
-// obrigatórios. Seqs conforme DefaultPositions.
-var optionalSeqs = map[int]bool{2: true, 3: true, 5: true} // Vice, Sec.Exec, 2º Sec
-
-const (
-	posPrimeiroSec = "1º Secretário"
-	posSegundoSec  = "2º Secretário"
-)
 
 type Round struct {
 	ID          int64
@@ -40,9 +34,10 @@ const MaxRounds = 3 // 1º/2º plenos; 3º é runoff (Art. 91e)
 // Cargos
 // ---------------------------------------------------------------------------
 
-func (s *Store) AddPosition(ctx context.Context, congressID int64, nome string, seq int) error {
+func (s *Store) AddPosition(ctx context.Context, congressID int64, nome, role string, seq int) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO position(congress_id, nome, seq) VALUES (?, ?, ?)`, congressID, nome, seq)
+		`INSERT INTO position(congress_id, nome, role, seq) VALUES (?, ?, ?, ?)`,
+		congressID, nome, role, seq)
 	return err
 }
 
@@ -64,8 +59,14 @@ func (s *Store) Positions(ctx context.Context, congressID int64) ([]Position, er
 
 // AllPositions lista todos os cargos, ativos e desativados (telas de configuração).
 func (s *Store) AllPositions(ctx context.Context, congressID int64) ([]Position, error) {
+	var ambito, sociedade string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT ambito, sociedade FROM congress WHERE id = ?`, congressID).
+		Scan(&ambito, &sociedade); err != nil {
+		return nil, err
+	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT p.id, p.nome, p.seq, p.ativo, p.status, p.eleito_elector_id, COALESCE(e.nome,'')
+		SELECT p.id, p.nome, p.role, p.seq, p.ativo, p.status, p.eleito_elector_id, COALESCE(e.nome,'')
 		FROM position p LEFT JOIN elector e ON e.id = p.eleito_elector_id
 		WHERE p.congress_id = ? ORDER BY p.seq`, congressID)
 	if err != nil {
@@ -77,11 +78,12 @@ func (s *Store) AllPositions(ctx context.Context, congressID int64) ([]Position,
 	for rows.Next() {
 		var p Position
 		var ativo int
-		if err := rows.Scan(&p.ID, &p.Nome, &p.Seq, &ativo, &p.Status, &p.EleitoID, &p.EleitoNome); err != nil {
+		if err := rows.Scan(&p.ID, &p.Nome, &p.Role, &p.Seq, &ativo, &p.Status, &p.EleitoID, &p.EleitoNome); err != nil {
 			return nil, err
 		}
 		p.Ativo = ativo == 1
-		if p.Nome == posSegundoSec && p.Ativo {
+		p.Optional = OptionalRole(ambito, sociedade, p.Role)
+		if p.Role == RoleSegundoSec && p.Ativo {
 			segundoAtivo = true
 		}
 		out = append(out, p)
@@ -89,15 +91,22 @@ func (s *Store) AllPositions(ctx context.Context, congressID int64) ([]Position,
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// Sem o 2º Secretário, o 1º exibe-se apenas como "Secretário" (SPEC §3.5).
+	// Sem o 2º Secretário, o 1º exibe-se apenas como "Secretário(a)" (SPEC §3.5).
 	if !segundoAtivo {
 		for i := range out {
-			if out[i].Nome == posPrimeiroSec {
-				out[i].Nome = "Secretário"
+			if out[i].Role == RolePrimeiroSec {
+				out[i].Nome = secretarioSolo(out[i].Nome)
 			}
 		}
 	}
 	return out, nil
+}
+
+// secretarioSolo tira o ordinal do 1º Secretário ("1º Secretário"→"Secretário",
+// "1ª Secretária"→"Secretária") quando o 2º está desativado.
+func secretarioSolo(nome string) string {
+	nome = strings.TrimPrefix(nome, "1º ")
+	return strings.TrimPrefix(nome, "1ª ")
 }
 
 func (s *Store) GetPosition(ctx context.Context, id int64) (Position, error) {
@@ -105,21 +114,21 @@ func (s *Store) GetPosition(ctx context.Context, id int64) (Position, error) {
 	var ativo int
 	var congressID int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT p.id, p.nome, p.seq, p.ativo, p.congress_id, p.status, p.eleito_elector_id, COALESCE(e.nome,'')
+		SELECT p.id, p.nome, p.role, p.seq, p.ativo, p.congress_id, p.status, p.eleito_elector_id, COALESCE(e.nome,'')
 		FROM position p LEFT JOIN elector e ON e.id = p.eleito_elector_id
 		WHERE p.id = ?`, id).
-		Scan(&p.ID, &p.Nome, &p.Seq, &ativo, &congressID, &p.Status, &p.EleitoID, &p.EleitoNome)
+		Scan(&p.ID, &p.Nome, &p.Role, &p.Seq, &ativo, &congressID, &p.Status, &p.EleitoID, &p.EleitoNome)
 	if err != nil {
 		return p, err
 	}
 	p.Ativo = ativo == 1
-	if p.Nome == posPrimeiroSec {
+	if p.Role == RolePrimeiroSec {
 		var segundoAtivo int
 		s.db.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM position WHERE congress_id = ? AND nome = ? AND ativo = 1`,
-			congressID, posSegundoSec).Scan(&segundoAtivo)
+			`SELECT COUNT(*) FROM position WHERE congress_id = ? AND role = ? AND ativo = 1`,
+			congressID, RoleSegundoSec).Scan(&segundoAtivo)
 		if segundoAtivo == 0 {
-			p.Nome = "Secretário"
+			p.Nome = secretarioSolo(p.Nome)
 		}
 	}
 	return p, nil
@@ -128,19 +137,20 @@ func (s *Store) GetPosition(ctx context.Context, id int64) (Position, error) {
 // SetPositionAtivo liga/desliga um cargo opcional. Desativar exige cargo pendente
 // (decidido/em eleição → desfaça pelo Histórico antes).
 func (s *Store) SetPositionAtivo(ctx context.Context, positionID int64, ativo bool) error {
-	var nome, status string
-	var seq, atual int
-	err := s.db.QueryRowContext(ctx,
-		`SELECT nome, seq, status, ativo FROM position WHERE id = ?`, positionID).
-		Scan(&nome, &seq, &status, &atual)
+	var nome, role, status, ambito, sociedade string
+	var atual int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT p.nome, p.role, p.status, p.ativo, c.ambito, c.sociedade
+		FROM position p JOIN congress c ON c.id = p.congress_id WHERE p.id = ?`, positionID).
+		Scan(&nome, &role, &status, &atual, &ambito, &sociedade)
 	if err != nil {
 		return err
 	}
 	if (atual == 1) == ativo {
 		return nil // sem mudança
 	}
-	if !optionalSeqs[seq] {
-		return errors.New(nome + " é obrigatório e não pode ser desativado")
+	if !OptionalRole(ambito, sociedade, role) {
+		return errors.New(nome + " é obrigatório neste âmbito e não pode ser desativado")
 	}
 	if !ativo && status != "pendente" {
 		return errors.New(nome + " está " + status + " — desfaça pelo Histórico antes de desativar")
@@ -208,17 +218,17 @@ func (s *Store) OpenRound(ctx context.Context, congressID int64) (Round, Positio
 // AbrirCargo coloca o cargo em eleição e abre o 1º escrutínio.
 // `indicados` é opcional (Art. 91d); vazio => votável = todos os presentes.
 func (s *Store) AbrirCargo(ctx context.Context, congressID, positionID int64, indicados []int64) (Round, error) {
-	var declarado, encerrada int
+	var declarada, encerrada int
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT quorum_declarado, encerrada FROM congress WHERE id = ?`, congressID).
-		Scan(&declarado, &encerrada); err != nil {
+		`SELECT abertura_declarada, encerrada FROM congress WHERE id = ?`, congressID).
+		Scan(&declarada, &encerrada); err != nil {
 		return Round{}, err
 	}
 	if encerrada == 1 {
 		return Round{}, errors.New("a eleição está encerrada")
 	}
-	if declarado == 0 {
-		return Round{}, errors.New("declare o quórum antes de abrir um escrutínio")
+	if declarada == 0 {
+		return Round{}, errors.New("declare a abertura (com quórum) antes de abrir um escrutínio")
 	}
 	var nome string
 	var posAtivo int
@@ -400,28 +410,37 @@ func (s *Store) Rounds(ctx context.Context, positionID int64) ([]Round, error) {
 }
 
 // VotableElectors devolve quem pode receber voto num escrutínio: o conjunto
-// restrito (indicação/runoff) se houver, senão todos os delegados presentes —
-// sempre EXCLUINDO quem já foi eleito para outro cargo (não se acumula cargos).
+// restrito (indicação/runoff) se houver, senão todos os presentes — sempre
+// EXCLUINDO quem já foi eleito para outro cargo (não se acumula cargos) e quem
+// excede a idade máxima do âmbito (Art. 4º §3–4; SPEC §3.1).
 func (s *Store) VotableElectors(ctx context.Context, roundID int64) ([]Elector, error) {
 	var restrito int
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM round_candidate WHERE round_id = ?`, roundID).Scan(&restrito); err != nil {
 		return nil, err
 	}
-	const naoEleito = ` AND e.id NOT IN (
+	var ambito, sociedade string
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT c.ambito, c.sociedade FROM round r
+		JOIN position p ON p.id = r.position_id
+		JOIN congress c ON c.id = p.congress_id WHERE r.id = ?`, roundID).
+		Scan(&ambito, &sociedade); err != nil {
+		return nil, err
+	}
+	naoEleito := ` AND e.id NOT IN (
 		SELECT eleito_elector_id FROM position
-		WHERE congress_id = e.congress_id AND eleito_elector_id IS NOT NULL)`
+		WHERE congress_id = e.congress_id AND eleito_elector_id IS NOT NULL)` +
+		ageEligibleSQL(ambito, sociedade)
 	if restrito > 0 {
 		return s.queryElectors(ctx, `
-			SELECT e.id, e.nome, e.local_id, COALESCE(l.nome,''), e.nato, e.nascimento, e.credenciado, e.presente
+			SELECT `+electorCols+`
 			FROM round_candidate rc
-			JOIN elector e ON e.id = rc.elector_id
-			LEFT JOIN local l ON l.id = e.local_id
+			JOIN elector e ON e.id = rc.elector_id`+electorJoins+`
 			WHERE rc.round_id = ?`+naoEleito+` ORDER BY e.nome`, roundID)
 	}
 	return s.queryElectors(ctx, `
-		SELECT e.id, e.nome, e.local_id, COALESCE(l.nome,''), e.nato, e.nascimento, e.credenciado, e.presente
-		FROM elector e LEFT JOIN local l ON l.id = e.local_id
+		SELECT `+electorCols+`
+		FROM elector e`+electorJoins+`
 		WHERE e.presente = 1 AND e.congress_id = (
 		  SELECT p.congress_id FROM round r JOIN position p ON p.id = r.position_id WHERE r.id = ?)`+
 		naoEleito+` ORDER BY e.nome`, roundID)

@@ -3,7 +3,7 @@
 <div class="shell">
   {{template "mesanav" .}}
   <main class="content"><div class="wrap has-bottomnav">
-    <p class="eyebrow">{{.Congresso.Federacao}} · {{.Congresso.Ano}}</p>
+    <p class="eyebrow">{{.Congresso.Nome}} · {{.Congresso.Ano}}</p>
     <div class="row">
       <h1>Escrutínio</h1>
       <a href="/board/ajustes" aria-label="Ajustes" title="Ajustes" class="mut" style="display:inline-flex">
@@ -26,18 +26,40 @@
     <strong>Eleição encerrada</strong> — só leitura. Reabra pelo Histórico para alterar.</div>{{end}}
 
   <div class="card">
-    <div class="row">
-      <div><span class="num">{{.Quorum.LocaisRepresentadas}}/{{.Quorum.LocaisTotal}}</span>
-        <div class="mut">UMPs locais</div></div>
-      <div style="text-align:right"><span class="num">{{.Quorum.Presentes}}</span>
-        <div class="mut">presentes</div></div>
-    </div>
+    {{if eq .Quorum.Ambito "local"}}
+      <div class="row">
+        <div><span class="num">{{.Quorum.Presentes}}/{{.Quorum.RolTotal}}</span>
+          <div class="mut">{{term "votantes"}} presentes (rol)</div></div>
+      </div>
+    {{else if eq .Quorum.Ambito "nacional"}}
+      <div class="row">
+        <div><span class="num">{{.Quorum.UnidadesRepr}}/{{.Quorum.UnidadesTotal}}</span>
+          <div class="mut">Sinodais (> metade)</div></div>
+        <div><span class="num">{{.Quorum.SubRepr}}/{{.Quorum.SubTotal}}</span>
+          <div class="mut">Federações (≥ ⅓)</div></div>
+        <div style="text-align:right"><span class="num">{{.Quorum.Presentes}}</span>
+          <div class="mut">presentes</div></div>
+      </div>
+    {{else}}
+      <div class="row">
+        <div><span class="num">{{.Quorum.UnidadesRepr}}/{{.Quorum.UnidadesTotal}}</span>
+          <div class="mut">{{term "unidades"}}</div></div>
+        <div style="text-align:right"><span class="num">{{.Quorum.Presentes}}</span>
+          <div class="mut">presentes</div></div>
+      </div>
+    {{end}}
     <p style="margin-top:10px">
-      {{if .Quorum.LocaisOk}}<span class="pill on">há quórum</span>{{else}}<span class="pill off">sem quórum</span>{{end}}
-      {{if .Congresso.QuorumDeclarado}}<span class="pill on">declarado</span>{{end}}
+      {{if .Quorum.Ok}}<span class="pill on">há quórum</span>{{else}}<span class="pill off">sem quórum</span>{{end}}
+      {{if .Congresso.AberturaDeclarada}}<span class="pill on">abertura declarada</span>{{end}}
     </p>
-    {{if not .Congresso.QuorumDeclarado}}
-      <form hx-post="/board/quorum" hx-swap="none"><button class="ok">Declarar quórum</button></form>
+    {{if not .Congresso.AberturaDeclarada}}
+      {{if .Quorum.Ok}}
+        <form hx-post="/board/abertura" hx-swap="none"><button class="ok">Declarar abertura</button></form>
+      {{else}}
+        <button class="ok" disabled title="quórum não atingido">Declarar abertura</button>
+        <p class="mut" style="margin-top:8px">O botão habilita quando o quórum for atingido.
+          Rol incorreto? Corrija na aba {{term "Credenciar"}} — o cálculo acompanha.</p>
+      {{end}}
     {{end}}
   </div>
 
@@ -70,12 +92,12 @@
             <button>Abrir {{if eq .Round.Numero 2}}3º escrutínio (2º turno){{else}}próximo escrutínio{{end}}</button></form>
         {{end}}
       {{else}}
-        {{if .Congresso.QuorumDeclarado}}
+        {{if .Congresso.AberturaDeclarada}}
           <form hx-post="/board/cargo/abrir" hx-swap="none">
             <input type="hidden" name="position_id" value="{{.Atual.ID}}">
             <button>Abrir escrutínio</button></form>
         {{else}}
-          <p class="mut">Declare o quórum acima para abrir o escrutínio.</p>
+          <p class="mut">Declare a abertura acima para abrir o escrutínio.</p>
         {{end}}
       {{end}}
     </div>

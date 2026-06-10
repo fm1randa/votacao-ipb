@@ -12,11 +12,13 @@ import (
 // ---------------------------------------------------------------------------
 
 type Congress struct {
-	ID              int64
-	Federacao       string
-	Ano             int
-	QuorumDeclarado bool
-	Encerrada       bool
+	ID                int64
+	Ambito            string // local | federacao | sinodal | nacional
+	Sociedade         string // UMP | UPA | UPH | SAF | UCP
+	Nome              string // nome da entidade (ex.: "Federação de UMP do PRNT")
+	Ano               int
+	AberturaDeclarada bool
+	Encerrada         bool
 }
 
 type Local struct {
@@ -25,35 +27,50 @@ type Local struct {
 }
 
 type Elector struct {
-	ID          int64
-	Nome        string
-	LocalID     sql.NullInt64
-	LocalNome   string
-	Nato        bool
-	Nascimento  sql.NullString
-	Credenciado bool
-	Presente    bool
+	ID           int64
+	Nome         string
+	LocalID      sql.NullInt64
+	LocalNome    string
+	SubLocalID   sql.NullInt64
+	SubLocalNome string // Federação do delegado (só âmbito nacional)
+	Nato         bool
+	Nascimento   sql.NullString
+	Credenciado  bool
+	Presente     bool
 }
 
-// QuorumInfo alimenta o painel da Mesa: representação por UMP local (oficial,
-// Art. 49a) e o headcount de presentes.
+// QuorumInfo alimenta o painel da Mesa. A regra varia por âmbito (Art. 12 §2º, 49):
+//   - local:      mais da metade dos sócios ativos do ROL (pessoas);
+//   - federacao:  mais da metade das UMPs locais representadas;
+//   - sinodal:    mais da metade das Federações representadas;
+//   - nacional:   mais da metade das Sinodais E ≥ 1/3 das Federações (subunidades).
+//
+// `Ok` é o gate computado da Declaração de Abertura (ADR-0010).
 type QuorumInfo struct {
-	Presentes           int // pessoas presentes (headcount)
-	Credenciados        int // já receberam token alguma vez
-	LocaisTotal         int
-	LocaisRepresentadas int  // locais com ≥1 delegado presente
-	LocaisOk            bool // mais da metade das locais
-	TokensEntregues     int
-	Reemissoes          int // tokens entregues além dos credenciados (perdas)
+	Ambito          string
+	Presentes       int // pessoas presentes (headcount)
+	Credenciados    int // já receberam token alguma vez
+	RolTotal        int // total do rol (denominador no âmbito local)
+	UnidadesTotal   int // unidades primárias cadastradas (nivel 0)
+	UnidadesRepr    int // unidades com ≥1 delegado presente
+	SubTotal        int // só nacional: federações cadastradas (nivel 1)
+	SubRepr         int // só nacional: federações com ≥1 delegado presente
+	Ok              bool
+	TokensEntregues int
+	Reemissoes      int // tokens entregues além dos credenciados (perdas)
 }
 
 // ---------------------------------------------------------------------------
-// Congresso, locais, rol
+// Congresso/Plenária, unidades, rol
 // ---------------------------------------------------------------------------
 
-func (s *Store) CreateCongress(ctx context.Context, federacao string, ano int) (int64, error) {
+func (s *Store) CreateCongress(ctx context.Context, ambito, sociedade, nome string, ano int) (int64, error) {
+	if !ValidAmbito(ambito) || !ValidSociedade(sociedade) {
+		return 0, errors.New("âmbito ou sociedade inválidos")
+	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO congress(federacao, ano) VALUES (?, ?)`, federacao, ano)
+		`INSERT INTO congress(ambito, sociedade, nome, ano) VALUES (?, ?, ?, ?)`,
+		ambito, sociedade, nome, ano)
 	if err != nil {
 		return 0, err
 	}
@@ -64,69 +81,131 @@ func (s *Store) CreateCongress(ctx context.Context, federacao string, ano int) (
 func (s *Store) FirstCongress(ctx context.Context) (Congress, error) {
 	var c Congress
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, federacao, ano, quorum_declarado, encerrada FROM congress ORDER BY id LIMIT 1`).
-		Scan(&c.ID, &c.Federacao, &c.Ano, &c.QuorumDeclarado, &c.Encerrada)
+		`SELECT id, ambito, sociedade, nome, ano, abertura_declarada, encerrada
+		 FROM congress ORDER BY id LIMIT 1`).
+		Scan(&c.ID, &c.Ambito, &c.Sociedade, &c.Nome, &c.Ano, &c.AberturaDeclarada, &c.Encerrada)
 	return c, err
 }
 
-func (s *Store) DeclararQuorum(ctx context.Context, congressID int64) error {
-	if err := s.snapshotOp(ctx, "Declarou o quórum"); err != nil {
+// DeclararAbertura é o gate computado (ADR-0010): só declara com quórum
+// atingido. Sem override — rol incorreto corrige-se editando o rol.
+func (s *Store) DeclararAbertura(ctx context.Context, congressID int64) error {
+	q, err := s.Quorum(ctx, congressID)
+	if err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE congress SET quorum_declarado = 1 WHERE id = ?`, congressID)
+	if !q.Ok {
+		return errors.New("quórum não atingido — confira a presença e o rol")
+	}
+	if err := s.snapshotOp(ctx, "Declarou a abertura (quórum verificado)"); err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`UPDATE congress SET abertura_declarada = 1 WHERE id = ?`, congressID)
 	return err
 }
 
-// Cargos da Diretoria da Federação UMP, na ordem de eleição (GTSI Art. 26a).
-var DefaultPositions = []string{"Presidente", "Vice-presidente", "Secretário Executivo",
-	"1º Secretário", "2º Secretário", "Tesoureiro"}
-
-// SetupCongress cria o congresso com os 6 cargos do GTSI e a pilha inicial de
-// tokens — o passo 2 do wizard. `disabledSeqs` desativa cargos opcionais
-// (federações menores; SPEC §3.5).
-func (s *Store) SetupCongress(ctx context.Context, federacao string, ano int, disabledSeqs []int) (int64, error) {
-	if err := s.snapshotOp(ctx, "Configurou o congresso"); err != nil {
+// SetupCongress cria o evento com o preset de cargos do âmbito×sociedade e a
+// pilha inicial de tokens — o passo 2 do wizard. `disabledRoles` desativa
+// cargos opcionais do preset (SPEC §3.5, §10).
+func (s *Store) SetupCongress(ctx context.Context, ambito, sociedade, nome string, ano int, disabledRoles []string) (int64, error) {
+	if err := s.snapshotOp(ctx, "Configurou a eleição"); err != nil {
 		return 0, err
 	}
-	id, err := s.CreateCongress(ctx, federacao, ano)
+	id, err := s.CreateCongress(ctx, ambito, sociedade, nome, ano)
 	if err != nil {
 		return 0, err
 	}
-	off := map[int]bool{}
-	for _, seq := range disabledSeqs {
-		if optionalSeqs[seq] {
-			off[seq] = true
-		}
-	}
-	for i, nome := range DefaultPositions {
-		if err := s.AddPosition(ctx, id, nome, i+1); err != nil {
-			return 0, err
-		}
-		if off[i+1] {
-			if _, err := s.db.ExecContext(ctx,
-				`UPDATE position SET ativo = 0 WHERE congress_id = ? AND seq = ?`, id, i+1); err != nil {
-				return 0, err
-			}
-		}
+	if err := s.applyPositionPreset(ctx, id, ambito, sociedade, disabledRoles); err != nil {
+		return 0, err
 	}
 	return id, s.GenerateTokens(ctx, id, 100)
 }
 
-// UpdateCongress altera federação/ano (tela Ajustes).
-func (s *Store) UpdateCongress(ctx context.Context, id int64, federacao string, ano int) error {
-	if err := s.snapshotOp(ctx, "Alterou dados do congresso"); err != nil {
+// applyPositionPreset cria os cargos do preset (apagando os existentes).
+func (s *Store) applyPositionPreset(ctx context.Context, congressID int64, ambito, sociedade string, disabledRoles []string) error {
+	off := map[string]bool{}
+	for _, r := range disabledRoles {
+		if OptionalRole(ambito, sociedade, r) {
+			off[r] = true
+		}
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM position WHERE congress_id = ?`, congressID); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE congress SET federacao = ?, ano = ? WHERE id = ?`, federacao, ano, id)
-	return err
+	for i, p := range PresetPositions(ambito, sociedade) {
+		if err := s.AddPosition(ctx, congressID, p.Nome, p.Role, i+1); err != nil {
+			return err
+		}
+		if off[p.Role] {
+			if _, err := s.db.ExecContext(ctx,
+				`UPDATE position SET ativo = 0 WHERE congress_id = ? AND role = ?`, congressID, p.Role); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-// Locals lista as UMPs locais (para o datalist dos formulários).
+// UpdateCongress altera os dados do evento (tela Ajustes). Trocar âmbito ou
+// sociedade re-aplica o preset de cargos e só é permitido antes da Declaração
+// de Abertura e sem escrutínios (SPEC §10.1).
+func (s *Store) UpdateCongress(ctx context.Context, id int64, ambito, sociedade, nome string, ano int) error {
+	if !ValidAmbito(ambito) || !ValidSociedade(sociedade) {
+		return errors.New("âmbito ou sociedade inválidos")
+	}
+	cur, err := s.FirstCongress(ctx)
+	if err != nil {
+		return err
+	}
+	mudouPreset := cur.Ambito != ambito || cur.Sociedade != sociedade
+	if mudouPreset {
+		if cur.AberturaDeclarada {
+			return errors.New("a abertura já foi declarada — âmbito e sociedade não podem mais mudar")
+		}
+		var rounds int
+		if err := s.db.QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM round r JOIN position p ON p.id = r.position_id
+			WHERE p.congress_id = ?`, id).Scan(&rounds); err != nil {
+			return err
+		}
+		if rounds > 0 {
+			return errors.New("já houve escrutínios — desfaça pelo Histórico antes de trocar o âmbito")
+		}
+	}
+	desc := "Alterou dados da eleição"
+	if mudouPreset {
+		desc = "Alterou âmbito/sociedade (cargos redefinidos)"
+	}
+	if err := s.snapshotOp(ctx, desc); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE congress SET ambito = ?, sociedade = ?, nome = ?, ano = ? WHERE id = ?`,
+		ambito, sociedade, nome, ano, id); err != nil {
+		return err
+	}
+	if mudouPreset {
+		return s.applyPositionPreset(ctx, id, ambito, sociedade, nil)
+	}
+	return nil
+}
+
+// Locals lista as unidades de representação primárias (datalist dos formulários).
 func (s *Store) Locals(ctx context.Context, congressID int64) ([]Local, error) {
+	return s.queryLocals(ctx, congressID, 0)
+}
+
+// SubLocals lista as subunidades (Federações; só no âmbito nacional).
+func (s *Store) SubLocals(ctx context.Context, congressID int64) ([]Local, error) {
+	return s.queryLocals(ctx, congressID, 1)
+}
+
+func (s *Store) queryLocals(ctx context.Context, congressID int64, nivel int) ([]Local, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, nome FROM local WHERE congress_id = ? ORDER BY nome`, congressID)
+		`SELECT id, nome FROM local WHERE congress_id = ? AND nivel = ? ORDER BY nome`,
+		congressID, nivel)
 	if err != nil {
 		return nil, err
 	}
@@ -142,40 +221,43 @@ func (s *Store) Locals(ctx context.Context, congressID int64) ([]Local, error) {
 	return out, rows.Err()
 }
 
-// LocalByNameOrCreate acha a UMP local pelo nome (sem case) ou cria uma nova.
-func (s *Store) LocalByNameOrCreate(ctx context.Context, congressID int64, nome string) (int64, error) {
+// LocalByNameOrCreate acha a unidade pelo nome (sem case) ou cria uma nova.
+func (s *Store) LocalByNameOrCreate(ctx context.Context, congressID int64, nome string, nivel int) (int64, error) {
 	var id int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id FROM local WHERE congress_id = ? AND lower(nome) = lower(?)`,
-		congressID, nome).Scan(&id)
+		`SELECT id FROM local WHERE congress_id = ? AND nivel = ? AND lower(nome) = lower(?)`,
+		congressID, nivel, nome).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return s.AddLocal(ctx, congressID, nome)
+		return s.AddLocal(ctx, congressID, nome, nivel)
 	}
 	return id, err
 }
 
-func (s *Store) AddLocal(ctx context.Context, congressID int64, nome string) (int64, error) {
+func (s *Store) AddLocal(ctx context.Context, congressID int64, nome string, nivel int) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO local(congress_id, nome) VALUES (?, ?)`, congressID, nome)
+		`INSERT INTO local(congress_id, nome, nivel) VALUES (?, ?, ?)`, congressID, nome, nivel)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
-// AddElector cadastra um delegado. localID nulo + nato=true para membros natos.
-func (s *Store) AddElector(ctx context.Context, congressID int64, nome string, localID *int64, nato bool, nascimento string) (int64, error) {
-	var loc interface{}
+// AddElector cadastra um votante. localID nulo + nato=true para membros natos;
+// subLocalID = Federação do delegado (só âmbito nacional).
+func (s *Store) AddElector(ctx context.Context, congressID int64, nome string, localID, subLocalID *int64, nato bool, nascimento string) (int64, error) {
+	var loc, sub, nasc interface{}
 	if localID != nil {
 		loc = *localID
 	}
-	var nasc interface{}
+	if subLocalID != nil {
+		sub = *subLocalID
+	}
 	if nascimento != "" {
 		nasc = nascimento
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO elector(congress_id, nome, local_id, nato, nascimento) VALUES (?,?,?,?,?)`,
-		congressID, nome, loc, boolToInt(nato), nasc)
+		`INSERT INTO elector(congress_id, nome, local_id, sub_local_id, nato, nascimento) VALUES (?,?,?,?,?,?)`,
+		congressID, nome, loc, sub, boolToInt(nato), nasc)
 	if err != nil {
 		return 0, err
 	}
@@ -184,60 +266,92 @@ func (s *Store) AddElector(ctx context.Context, congressID int64, nome string, l
 
 // ElectorInput é uma linha de cadastro (form individual ou colar lista).
 type ElectorInput struct {
-	Nome, LocalNome, Nascimento string
-	Nato                        bool
+	Nome, LocalNome, SubLocalNome, Nascimento string
+	Nato                                      bool
 }
 
-// ImportElectors cadastra delegados numa só operação do log (opDesc descreve:
-// "Adicionou delegado X" ou "Importou N delegados"). Igrejas inexistentes são
-// criadas; garante a pilha de tokens ao final.
+// resolveUnits resolve (criando se preciso) unidade e subunidade de um input,
+// já aplicando as regras do âmbito: local não tem unidades nem natos;
+// subunidade só existe no nacional.
+func (s *Store) resolveUnits(ctx context.Context, cong Congress, in *ElectorInput) (localID, subID *int64, err error) {
+	if cong.Ambito == AmbitoLocal {
+		in.Nato = false
+		return nil, nil, nil
+	}
+	if !in.Nato && strings.TrimSpace(in.LocalNome) != "" {
+		id, err := s.LocalByNameOrCreate(ctx, cong.ID, strings.TrimSpace(in.LocalNome), 0)
+		if err != nil {
+			return nil, nil, err
+		}
+		localID = &id
+	}
+	if cong.Ambito == AmbitoNacional && !in.Nato && strings.TrimSpace(in.SubLocalNome) != "" {
+		id, err := s.LocalByNameOrCreate(ctx, cong.ID, strings.TrimSpace(in.SubLocalNome), 1)
+		if err != nil {
+			return nil, nil, err
+		}
+		subID = &id
+	}
+	return localID, subID, nil
+}
+
+// ImportElectors cadastra votantes numa só operação do log (opDesc descreve:
+// "Adicionou X" ou "Importou N"). Unidades inexistentes são criadas; garante a
+// pilha de tokens ao final.
 func (s *Store) ImportElectors(ctx context.Context, congressID int64, items []ElectorInput, opDesc string) error {
 	if len(items) == 0 {
-		return errors.New("nenhum delegado para cadastrar")
+		return errors.New("ninguém para cadastrar")
+	}
+	cong, err := s.FirstCongress(ctx)
+	if err != nil {
+		return err
 	}
 	if err := s.snapshotOp(ctx, opDesc); err != nil {
 		return err
 	}
-	for _, it := range items {
-		var localID *int64
-		if !it.Nato && strings.TrimSpace(it.LocalNome) != "" {
-			id, err := s.LocalByNameOrCreate(ctx, congressID, strings.TrimSpace(it.LocalNome))
-			if err != nil {
-				return err
-			}
-			localID = &id
+	for i := range items {
+		it := items[i]
+		localID, subID, err := s.resolveUnits(ctx, cong, &it)
+		if err != nil {
+			return err
 		}
-		if _, err := s.AddElector(ctx, congressID, strings.TrimSpace(it.Nome), localID, it.Nato, it.Nascimento); err != nil {
+		if _, err := s.AddElector(ctx, congressID, strings.TrimSpace(it.Nome), localID, subID, it.Nato, it.Nascimento); err != nil {
 			return err
 		}
 	}
 	return s.EnsureTokens(ctx, congressID)
 }
 
-// UpdateElector edita nome/igreja/nato/nascimento de um delegado.
+// UpdateElector edita nome/unidade/nato/nascimento de um votante.
 func (s *Store) UpdateElector(ctx context.Context, congressID, id int64, in ElectorInput) error {
-	if err := s.snapshotOp(ctx, "Editou delegado "+strings.TrimSpace(in.Nome)); err != nil {
+	cong, err := s.FirstCongress(ctx)
+	if err != nil {
 		return err
 	}
-	var localID interface{}
-	if !in.Nato && strings.TrimSpace(in.LocalNome) != "" {
-		lid, err := s.LocalByNameOrCreate(ctx, congressID, strings.TrimSpace(in.LocalNome))
-		if err != nil {
-			return err
-		}
-		localID = lid
+	if err := s.snapshotOp(ctx, "Editou "+strings.TrimSpace(in.Nome)); err != nil {
+		return err
 	}
-	var nasc interface{}
+	localID, subID, err := s.resolveUnits(ctx, cong, &in)
+	if err != nil {
+		return err
+	}
+	var loc, sub, nasc interface{}
+	if localID != nil {
+		loc = *localID
+	}
+	if subID != nil {
+		sub = *subID
+	}
 	if in.Nascimento != "" {
 		nasc = in.Nascimento
 	}
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE elector SET nome = ?, local_id = ?, nato = ?, nascimento = ? WHERE id = ?`,
-		strings.TrimSpace(in.Nome), localID, boolToInt(in.Nato), nasc, id)
+	_, err = s.db.ExecContext(ctx,
+		`UPDATE elector SET nome = ?, local_id = ?, sub_local_id = ?, nato = ?, nascimento = ? WHERE id = ?`,
+		strings.TrimSpace(in.Nome), loc, sub, boolToInt(in.Nato), nasc, id)
 	return err
 }
 
-// DeleteElector remove um delegado que NUNCA foi credenciado (depois disso,
+// DeleteElector remove um votante que NUNCA foi credenciado (depois disso,
 // usa-se o registro de saída — a presença é parte da história da eleição).
 func (s *Store) DeleteElector(ctx context.Context, id int64) error {
 	var nome string
@@ -248,9 +362,9 @@ func (s *Store) DeleteElector(ctx context.Context, id int64) error {
 		return err
 	}
 	if credenciado == 1 {
-		return errors.New("delegado já credenciado — registre a saída em vez de remover")
+		return errors.New("já credenciado — registre a saída em vez de remover")
 	}
-	if err := s.snapshotOp(ctx, "Removeu delegado "+nome); err != nil {
+	if err := s.snapshotOp(ctx, "Removeu "+nome); err != nil {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `DELETE FROM elector WHERE id = ?`, id)
@@ -273,19 +387,23 @@ func (s *Store) EnsureTokens(ctx context.Context, congressID int64) error {
 	return nil
 }
 
-// Electors lista o rol com o nome da UMP local.
+// electorCols são as colunas padrão de leitura do rol (alias e/l/sl).
+const electorCols = `e.id, e.nome, e.local_id, COALESCE(l.nome,''), e.sub_local_id, COALESCE(sl.nome,''),
+	 e.nato, e.nascimento, e.credenciado, e.presente`
+
+const electorJoins = ` LEFT JOIN local l ON l.id = e.local_id LEFT JOIN local sl ON sl.id = e.sub_local_id`
+
+// Electors lista o rol com os nomes das unidades.
 func (s *Store) Electors(ctx context.Context, congressID int64) ([]Elector, error) {
 	return s.queryElectors(ctx,
-		`SELECT e.id, e.nome, e.local_id, COALESCE(l.nome,''), e.nato, e.nascimento, e.credenciado, e.presente
-		 FROM elector e LEFT JOIN local l ON l.id = e.local_id
+		`SELECT `+electorCols+` FROM elector e`+electorJoins+`
 		 WHERE e.congress_id = ? ORDER BY e.nome`, congressID)
 }
 
-// GetElector devolve um delegado pelo id (com o nome da UMP local).
+// GetElector devolve um votante pelo id (com os nomes das unidades).
 func (s *Store) GetElector(ctx context.Context, id int64) (Elector, error) {
 	els, err := s.queryElectors(ctx,
-		`SELECT e.id, e.nome, e.local_id, COALESCE(l.nome,''), e.nato, e.nascimento, e.credenciado, e.presente
-		 FROM elector e LEFT JOIN local l ON l.id = e.local_id WHERE e.id = ?`, id)
+		`SELECT `+electorCols+` FROM elector e`+electorJoins+` WHERE e.id = ?`, id)
 	if err != nil {
 		return Elector{}, err
 	}
@@ -298,8 +416,7 @@ func (s *Store) GetElector(ctx context.Context, id int64) (Elector, error) {
 // PresentElectors lista só os presentes — o conjunto votável padrão.
 func (s *Store) PresentElectors(ctx context.Context, congressID int64) ([]Elector, error) {
 	return s.queryElectors(ctx,
-		`SELECT e.id, e.nome, e.local_id, COALESCE(l.nome,''), e.nato, e.nascimento, e.credenciado, e.presente
-		 FROM elector e LEFT JOIN local l ON l.id = e.local_id
+		`SELECT `+electorCols+` FROM elector e`+electorJoins+`
 		 WHERE e.congress_id = ? AND e.presente = 1 ORDER BY e.nome`, congressID)
 }
 
@@ -313,7 +430,8 @@ func (s *Store) queryElectors(ctx context.Context, query string, args ...interfa
 	for rows.Next() {
 		var e Elector
 		var nato, cred, pres int
-		if err := rows.Scan(&e.ID, &e.Nome, &e.LocalID, &e.LocalNome, &nato, &e.Nascimento, &cred, &pres); err != nil {
+		if err := rows.Scan(&e.ID, &e.Nome, &e.LocalID, &e.LocalNome, &e.SubLocalID, &e.SubLocalNome,
+			&nato, &e.Nascimento, &cred, &pres); err != nil {
 			return nil, err
 		}
 		e.Nato, e.Credenciado, e.Presente = nato == 1, cred == 1, pres == 1
@@ -323,15 +441,20 @@ func (s *Store) queryElectors(ctx context.Context, query string, args ...interfa
 }
 
 // ---------------------------------------------------------------------------
-// Credenciamento e presença (ADR-0002: presença é da pessoa, não do token)
+// Credenciamento/Chamada e presença (ADR-0002: presença é da pessoa, não do token)
 // ---------------------------------------------------------------------------
 
-// Credenciar marca o delegado como presente/credenciado E entrega um token cego,
-// numa transação. Devolve o código do token.
+// Credenciar marca o votante como presente/credenciado E entrega um token cego,
+// numa transação. Devolve o código do token. No âmbito local o ato é a Chamada
+// (Art. 86) — muda só a descrição no Histórico.
 func (s *Store) Credenciar(ctx context.Context, congressID, electorID int64) (string, error) {
 	var nome string
 	s.db.QueryRowContext(ctx, `SELECT nome FROM elector WHERE id = ?`, electorID).Scan(&nome)
-	if err := s.snapshotOp(ctx, "Credenciou "+nome); err != nil {
+	desc := "Credenciou " + nome
+	if cong, err := s.FirstCongress(ctx); err == nil && cong.Ambito == AmbitoLocal {
+		desc = "Registrou na chamada: " + nome
+	}
+	if err := s.snapshotOp(ctx, desc); err != nil {
 		return "", err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -347,7 +470,7 @@ func (s *Store) Credenciar(ctx context.Context, congressID, electorID int64) (st
 		return "", err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return "", errors.New("delegado não encontrado")
+		return "", errors.New("não encontrado no rol")
 	}
 
 	var code string
@@ -367,7 +490,7 @@ func (s *Store) Credenciar(ctx context.Context, congressID, electorID int64) (st
 	return code, nil
 }
 
-// SetPresente registra saída (false) ou reentrada (true) de um delegado já credenciado.
+// SetPresente registra saída (false) ou reentrada (true) de alguém já credenciado.
 func (s *Store) SetPresente(ctx context.Context, electorID int64, presente bool) error {
 	var nome string
 	s.db.QueryRowContext(ctx, `SELECT nome FROM elector WHERE id = ?`, electorID).Scan(&nome)
@@ -383,21 +506,41 @@ func (s *Store) SetPresente(ctx context.Context, electorID int64, presente bool)
 	return err
 }
 
-// Quorum calcula a representação por UMP local e o headcount.
+// Quorum computa a regra do âmbito (ver QuorumInfo). Natos não contam como
+// unidade representada nem entram no denominador (federados).
 func (s *Store) Quorum(ctx context.Context, congressID int64) (QuorumInfo, error) {
-	var q QuorumInfo
+	cong, err := s.FirstCongress(ctx)
+	if err != nil {
+		return QuorumInfo{}, err
+	}
+	q := QuorumInfo{Ambito: cong.Ambito}
 	row := s.db.QueryRowContext(ctx, `
 		SELECT
 		  (SELECT COUNT(*) FROM elector WHERE congress_id=? AND presente=1),
 		  (SELECT COUNT(*) FROM elector WHERE congress_id=? AND credenciado=1),
-		  (SELECT COUNT(*) FROM local   WHERE congress_id=?),
+		  (SELECT COUNT(*) FROM elector WHERE congress_id=?),
+		  (SELECT COUNT(*) FROM local   WHERE congress_id=? AND nivel=0),
 		  (SELECT COUNT(DISTINCT local_id) FROM elector WHERE congress_id=? AND presente=1 AND local_id IS NOT NULL),
+		  (SELECT COUNT(*) FROM local   WHERE congress_id=? AND nivel=1),
+		  (SELECT COUNT(DISTINCT sub_local_id) FROM elector WHERE congress_id=? AND presente=1 AND sub_local_id IS NOT NULL),
 		  (SELECT COUNT(*) FROM token WHERE congress_id=? AND entregue=1)`,
-		congressID, congressID, congressID, congressID, congressID)
-	if err := row.Scan(&q.Presentes, &q.Credenciados, &q.LocaisTotal, &q.LocaisRepresentadas, &q.TokensEntregues); err != nil {
+		congressID, congressID, congressID, congressID, congressID, congressID, congressID, congressID)
+	if err := row.Scan(&q.Presentes, &q.Credenciados, &q.RolTotal,
+		&q.UnidadesTotal, &q.UnidadesRepr, &q.SubTotal, &q.SubRepr, &q.TokensEntregues); err != nil {
 		return q, err
 	}
-	q.LocaisOk = q.LocaisRepresentadas*2 > q.LocaisTotal
+	switch cong.Ambito {
+	case AmbitoLocal:
+		// Art. 12 §2º: mais da metade dos sócios ativos do rol.
+		q.Ok = q.RolTotal > 0 && q.Presentes*2 > q.RolTotal
+	case AmbitoNacional:
+		// Art. 49c: mais da metade das Sinodais E pelo menos 1/3 das Federações.
+		q.Ok = q.UnidadesTotal > 0 && q.UnidadesRepr*2 > q.UnidadesTotal &&
+			q.SubTotal > 0 && q.SubRepr*3 >= q.SubTotal
+	default:
+		// Art. 49a–b: mais da metade das unidades (UMPs locais / Federações).
+		q.Ok = q.UnidadesTotal > 0 && q.UnidadesRepr*2 > q.UnidadesTotal
+	}
 	q.Reemissoes = q.TokensEntregues - q.Credenciados
 	if q.Reemissoes < 0 {
 		q.Reemissoes = 0

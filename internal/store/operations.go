@@ -345,7 +345,7 @@ func (s *Store) ReiniciarEleicao(ctx context.Context, congressID int64) error {
 		`UPDATE elector SET presente = 0, credenciado = 0 WHERE congress_id = ?`,
 		`UPDATE token SET entregue = 0, entregue_em = NULL WHERE congress_id = ?`,
 		`UPDATE position SET status = 'pendente', eleito_elector_id = NULL WHERE congress_id = ?`,
-		`UPDATE congress SET quorum_declarado = 0, encerrada = 0 WHERE id = ?`,
+		`UPDATE congress SET abertura_declarada = 0, encerrada = 0 WHERE id = ?`,
 	}
 	for _, q := range stmts {
 		if strings.Contains(q, "?") {

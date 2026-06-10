@@ -19,13 +19,19 @@
     <a href="/board" style="margin-left:12px">voltar</a></div>
 
   <div class="brand"><img src="/assets/img/logo_ipb.png" alt="Igreja Presbiteriana do Brasil"></div>
-  <h1>Relatório da eleição — {{.Congresso.Federacao}} ({{.Congresso.Ano}})</h1>
+  <h1>Relatório da eleição — {{.Congresso.Nome}} ({{.Congresso.Ano}})</h1>
 
-  <h2>Verificação de Poderes</h2>
+  <h2>{{if eq .Quorum.Ambito "local"}}Chamada e quórum{{else}}Verificação de Poderes{{end}}</h2>
   <table>
-    <tr><td>Delegados credenciados</td><td>{{.Quorum.Credenciados}}</td></tr>
-    <tr><td>Presentes</td><td>{{.Quorum.Presentes}}</td></tr>
-    <tr><td>UMPs locais representadas</td><td>{{.Quorum.LocaisRepresentadas}} de {{.Quorum.LocaisTotal}}{{if .Quorum.LocaisOk}} (há quórum){{else}} (sem quórum){{end}}</td></tr>
+    <tr><td>{{term "Votantes"}} com código entregue</td><td>{{.Quorum.Credenciados}}</td></tr>
+    <tr><td>Presentes</td><td>{{.Quorum.Presentes}}{{if eq .Quorum.Ambito "local"}} de {{.Quorum.RolTotal}} do rol{{end}}</td></tr>
+    {{if eq .Quorum.Ambito "nacional"}}
+      <tr><td>Sinodais representadas</td><td>{{.Quorum.UnidadesRepr}} de {{.Quorum.UnidadesTotal}}</td></tr>
+      <tr><td>Federações representadas</td><td>{{.Quorum.SubRepr}} de {{.Quorum.SubTotal}} (mínimo ⅓)</td></tr>
+    {{else if ne .Quorum.Ambito "local"}}
+      <tr><td>{{term "unidades"}} representadas</td><td>{{.Quorum.UnidadesRepr}} de {{.Quorum.UnidadesTotal}}</td></tr>
+    {{end}}
+    <tr><td>Quórum (Art. 12 §2º / 49)</td><td>{{if .Quorum.Ok}}<span class="ok">atingido</span>{{else}}não atingido{{end}}</td></tr>
     <tr><td>Tokens entregues</td><td>{{.Quorum.TokensEntregues}}{{if gt .Quorum.Reemissoes 0}} (reemissões: {{.Quorum.Reemissoes}}){{end}}</td></tr>
   </table>
 

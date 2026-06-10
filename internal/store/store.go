@@ -43,10 +43,32 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("aplicar schema: %w", err)
 	}
-	// Migração leve para bancos criados antes da coluna (erro de coluna duplicada é ok).
-	db.ExecContext(context.Background(),
-		`ALTER TABLE position ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1`)
+	migrate(db)
 	return &Store{db: db}, nil
+}
+
+// migrate aplica migrações leves em bancos antigos (erros de coluna
+// duplicada/inexistente são esperados e ignorados — schema novo já as tem).
+func migrate(db *sql.DB) {
+	ctx := context.Background()
+	for _, q := range []string{
+		`ALTER TABLE position ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1`,
+		// Multi-âmbito (ADR-0009/0010):
+		`ALTER TABLE congress RENAME COLUMN federacao TO nome`,
+		`ALTER TABLE congress RENAME COLUMN quorum_declarado TO abertura_declarada`,
+		`ALTER TABLE congress ADD COLUMN ambito TEXT NOT NULL DEFAULT 'federacao'`,
+		`ALTER TABLE congress ADD COLUMN sociedade TEXT NOT NULL DEFAULT 'UMP'`,
+		`ALTER TABLE local ADD COLUMN nivel INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE elector ADD COLUMN sub_local_id INTEGER REFERENCES local(id)`,
+		`ALTER TABLE position ADD COLUMN role TEXT NOT NULL DEFAULT ''`,
+		// Backfill de role pela seq do preset antigo (Art. 26a, 6 cargos).
+		`UPDATE position SET role = CASE seq
+			WHEN 1 THEN 'presidente' WHEN 2 THEN 'vice' WHEN 3 THEN 'sec_executivo'
+			WHEN 4 THEN 'primeiro_sec' WHEN 5 THEN 'segundo_sec' WHEN 6 THEN 'tesoureiro'
+			ELSE role END WHERE role = ''`,
+	} {
+		db.ExecContext(ctx, q)
+	}
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -192,17 +214,31 @@ func (s *Store) CastVote(ctx context.Context, roundID int64, token, kind string,
 	return tx.Commit()
 }
 
-// voteeIsAllowed: o delegado votado precisa estar presente, não pode já ter sido
-// eleito para outro cargo (não se acumula cargos na diretoria) e, se o escrutínio
-// tem conjunto restrito (round_candidate), precisa pertencer a ele.
+// voteeIsAllowed: o votado precisa estar presente, não pode já ter sido eleito
+// para outro cargo (não se acumula cargos na diretoria), não pode exceder a
+// idade máxima do âmbito (Art. 4º §3–4) e, se o escrutínio tem conjunto
+// restrito (round_candidate), precisa pertencer a ele.
 func voteeIsAllowed(ctx context.Context, tx *sql.Tx, roundID, votee int64) (bool, error) {
 	var presente int
-	err := tx.QueryRowContext(ctx, `SELECT presente FROM elector WHERE id = ?`, votee).Scan(&presente)
+	var nascimento sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT presente, nascimento FROM elector WHERE id = ?`, votee).Scan(&presente, &nascimento)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && presente == 0) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
+	}
+	var ambito, sociedade string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT c.ambito, c.sociedade FROM round r
+		JOIN position p ON p.id = r.position_id
+		JOIN congress c ON c.id = p.congress_id WHERE r.id = ?`, roundID).
+		Scan(&ambito, &sociedade); err != nil {
+		return false, err
+	}
+	if !ageEligible(ambito, sociedade, nascimento.String) {
+		return false, nil
 	}
 	var jaEleito int
 	if err := tx.QueryRowContext(ctx, `

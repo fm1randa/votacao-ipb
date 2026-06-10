@@ -1,5 +1,5 @@
--- Schema do sistema de votação (Congresso de Federação UMP).
--- Base normativa: GTSI 2015, Específica UMP (Art. 26, 49–52, 90–91). Ver SPEC.md.
+-- Schema do sistema de votação (Diretorias de Sociedades Internas da IPB).
+-- Base normativa: GTSI 2015 (Art. 90 local; Art. 26, 49–52, 91 federados). Ver SPEC.md §10.
 --
 -- Princípios centrais:
 --  * Sigilo: `vote` referencia o delegado VOTADO (público), nunca o votante.
@@ -7,6 +7,7 @@
 --  * Presença é da PESSOA, não do token (ADR-0002): quórum/reconciliação contam
 --    `elector.presente` (reversível), nunca tokens entregues.
 --  * Queima atômica do token: UNIQUE(round_id, token) em `vote`.
+--  * Multi-âmbito (ADR-0009): um motor só; âmbito+sociedade são configuração.
 
 PRAGMA foreign_keys = ON;
 
@@ -16,14 +17,20 @@ CREATE TABLE IF NOT EXISTS setting (
     value TEXT NOT NULL
 );
 
--- O evento. Em geral há um só por banco.
+-- O evento (Plenária local ou Congresso federado). Em geral há um só por banco.
+-- `abertura_declarada` é o gate computado da Declaração de Abertura (ADR-0010):
+-- só liga com quórum atingido; sem ela não se abre escrutínio.
 CREATE TABLE IF NOT EXISTS congress (
-    id                INTEGER PRIMARY KEY,
-    federacao         TEXT    NOT NULL,
-    ano               INTEGER NOT NULL,
-    quorum_declarado  INTEGER NOT NULL DEFAULT 0,  -- gate: a Mesa declara o quórum
-    encerrada         INTEGER NOT NULL DEFAULT 0,  -- eleição encerrada (só leitura)
-    criado_em         TEXT    NOT NULL DEFAULT (datetime('now'))
+    id                  INTEGER PRIMARY KEY,
+    ambito              TEXT    NOT NULL DEFAULT 'federacao'
+                        CHECK (ambito IN ('local','federacao','sinodal','nacional')),
+    sociedade           TEXT    NOT NULL DEFAULT 'UMP'
+                        CHECK (sociedade IN ('UMP','UPA','UPH','SAF','UCP')),
+    nome                TEXT    NOT NULL,  -- nome da entidade (ex.: "Federação de UMP do PRNT")
+    ano                 INTEGER NOT NULL,
+    abertura_declarada  INTEGER NOT NULL DEFAULT 0,
+    encerrada           INTEGER NOT NULL DEFAULT 0,  -- eleição encerrada (só leitura)
+    criado_em           TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Log de operações da Mesa (ADR-0006), à la jj: append-only, cada linha guarda um
@@ -36,26 +43,33 @@ CREATE TABLE IF NOT EXISTS operation (
     snapshot   TEXT    NOT NULL
 );
 
--- UMP local: base do quórum por representação (Art. 49a).
+-- Unidade de representação, base do quórum federado (Art. 49): UMP local na
+-- Federação, Federação na Sinodal, Sinodal na Nacional. `nivel` 0 = unidade
+-- primária; 1 = subunidade (só no âmbito nacional: a Federação do delegado,
+-- p/ o critério de ⅓ do Art. 49c). Sem uso no âmbito local.
 CREATE TABLE IF NOT EXISTS local (
     id           INTEGER PRIMARY KEY,
     congress_id  INTEGER NOT NULL REFERENCES congress(id) ON DELETE CASCADE,
-    nome         TEXT    NOT NULL
+    nome         TEXT    NOT NULL,
+    nivel        INTEGER NOT NULL DEFAULT 0
 );
 
--- Delegado (rol). `nato` => sem credencial e sem UMP local (Art. 52).
+-- Votante do rol: Sócio Ativo (âmbito local) ou Delegado (federados).
+-- `nato` => sem credencial e sem unidade (Art. 52; só federados).
 -- `credenciado` é monótono (já recebeu token alguma vez); `presente` é reversível
 -- (a Mesa registra saída/reentrada) e é o que conta para quórum/reconciliação.
+-- `nascimento` é obrigatório no app (desempate Art. 90g/91g + limites de idade).
 CREATE TABLE IF NOT EXISTS elector (
-    id           INTEGER PRIMARY KEY,
-    congress_id  INTEGER NOT NULL REFERENCES congress(id) ON DELETE CASCADE,
-    nome         TEXT    NOT NULL,
-    local_id     INTEGER REFERENCES local(id),   -- nulo para nato
-    nato         INTEGER NOT NULL DEFAULT 0,
-    nascimento   TEXT,                            -- opcional; desempate por idade (Art. 91g)
-    credenciado  INTEGER NOT NULL DEFAULT 0,
-    presente     INTEGER NOT NULL DEFAULT 0,
-    criado_em    TEXT    NOT NULL DEFAULT (datetime('now'))
+    id            INTEGER PRIMARY KEY,
+    congress_id   INTEGER NOT NULL REFERENCES congress(id) ON DELETE CASCADE,
+    nome          TEXT    NOT NULL,
+    local_id      INTEGER REFERENCES local(id),   -- nulo para nato e no âmbito local
+    sub_local_id  INTEGER REFERENCES local(id),   -- Federação do delegado (só nacional)
+    nato          INTEGER NOT NULL DEFAULT 0,
+    nascimento    TEXT,
+    credenciado   INTEGER NOT NULL DEFAULT 0,
+    presente      INTEGER NOT NULL DEFAULT 0,
+    criado_em     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_elector_congress ON elector(congress_id);
 
@@ -68,12 +82,15 @@ CREATE TABLE IF NOT EXISTS token (
     entregue_em  TEXT
 );
 
--- Cargo: posto eletivo da Diretoria, eleito em sequência (Art. 26a).
--- `ativo`: federações menores podem desabilitar Vice/Sec.Exec/2º Sec (SPEC §3.5).
+-- Cargo: posto eletivo da Diretoria, eleito em sequência. O conjunto vem do
+-- preset (âmbito × sociedade — SPEC §10.2); `role` identifica o papel
+-- independentemente do nome exibido (gênero, regiões da Nacional).
+-- `ativo`: cargos opcionais do âmbito podem ser desabilitados (SPEC §3.5).
 CREATE TABLE IF NOT EXISTS position (
     id                 INTEGER PRIMARY KEY,
     congress_id        INTEGER NOT NULL REFERENCES congress(id) ON DELETE CASCADE,
     nome               TEXT    NOT NULL,
+    role               TEXT    NOT NULL DEFAULT '',
     seq                INTEGER NOT NULL,
     ativo              INTEGER NOT NULL DEFAULT 1,
     status             TEXT    NOT NULL DEFAULT 'pendente'

@@ -2,6 +2,7 @@
 package web
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"encoding/json"
@@ -11,6 +12,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"votacao-ipb/internal/store"
 )
@@ -27,11 +30,103 @@ type Server struct {
 	hub  *Hub
 	addr string // porta de escuta (ex. ":8090") — usada no QR/baseURL
 	host string // override do -host: IP/host anunciado (QR, telão); "" = autodetectar
+
+	congCache atomic.Value // congEntry — alimenta os termos por âmbito (TTL curto)
+}
+
+// congEntry guarda o congresso em cache para o vocabulário por âmbito (SPEC §10):
+// os templates consultam `term`/`ambito` muitas vezes por render; o TTL de 1s
+// evita marteladas no SQLite e ainda reflete mudanças (Ajustes/restore) na hora.
+type congEntry struct {
+	c   store.Congress
+	exp time.Time
+}
+
+// cong devolve o congresso atual (ou um default Federação/UMP antes do setup).
+func (s *Server) cong() store.Congress {
+	if v := s.congCache.Load(); v != nil {
+		if e := v.(congEntry); time.Now().Before(e.exp) {
+			return e.c
+		}
+	}
+	c, err := s.st.FirstCongress(context.Background())
+	if err != nil {
+		c = store.Congress{Ambito: store.AmbitoFederacao, Sociedade: "UMP"}
+	}
+	s.congCache.Store(congEntry{c, time.Now().Add(time.Second)})
+	return c
+}
+
+// term traduz o vocabulário da UI conforme âmbito e sociedade (CONTEXT.md):
+// local fala "Sócio/Plenária/Chamada"; federados, "Delegado/Congresso/Credenciar";
+// a SAF flexiona no feminino (Sócia, Delegada).
+func (s *Server) term(key string) string {
+	c := s.cong()
+	local := c.Ambito == store.AmbitoLocal
+	fem := c.Sociedade == "SAF"
+	votante := map[bool]map[bool]string{
+		true:  {true: "Sócia", false: "Sócio"},
+		false: {true: "Delegada", false: "Delegado"},
+	}[local][fem]
+	unidade, unidades := "", ""
+	switch c.Ambito {
+	case store.AmbitoFederacao:
+		unidade, unidades = "UMP local", "UMPs locais"
+		if c.Sociedade != "UMP" {
+			unidade, unidades = c.Sociedade+" local", c.Sociedade+"s locais"
+		}
+	case store.AmbitoSinodal:
+		unidade, unidades = "Federação", "Federações"
+	case store.AmbitoNacional:
+		unidade, unidades = "Sinodal", "Sinodais"
+	}
+	switch key {
+	case "Votante":
+		return votante
+	case "Votantes":
+		return votante + "s"
+	case "votante":
+		return strings.ToLower(votante)
+	case "votantes":
+		return strings.ToLower(votante) + "s"
+	case "Evento":
+		if local {
+			return "Plenária"
+		}
+		return "Congresso"
+	case "Credenciar": // rótulo da aba/página
+		if local {
+			return "Chamada"
+		}
+		return "Credenciamento"
+	case "credenciar_btn": // botão da linha do rol
+		if local {
+			return "Chamar"
+		}
+		return "Credenciar"
+	case "aba_credenciar": // rótulo curto da navegação
+		if local {
+			return "Chamada"
+		}
+		return "Credenciar"
+	case "unidade":
+		return unidade
+	case "unidades":
+		return unidades
+	case "subunidade":
+		return "Federação"
+	case "subunidades":
+		return "Federações"
+	}
+	return key
 }
 
 func New(st *store.Store, addr, host string) (*Server, error) {
 	s := &Server{st: st, hub: newHub(), addr: addr, host: host}
 	funcs := template.FuncMap{
+		"term":      s.term,
+		"ambito":    func() string { return s.cong().Ambito },
+		"sociedade": func() string { return s.cong().Sociedade },
 		"pct": func(v, total int) int {
 			if total <= 0 {
 				return 0
@@ -80,6 +175,7 @@ func (s *Server) Routes() http.Handler {
 	// Mesa — onboarding (wizard de 3 passos) e configuração
 	mux.HandleFunc("GET /board/setup", s.setupWizard)
 	mux.HandleFunc("POST /board/setup", s.setupSubmit)
+	mux.HandleFunc("GET /board/setup/cargos", s.authPIN(s.setupCargosFragment))
 	mux.HandleFunc("POST /board/setup/congresso", s.authPIN(s.setupCongresso))
 	mux.HandleFunc("POST /board/delegados/add", s.authPIN(s.mut(s.delegadoAdd)))
 	mux.HandleFunc("POST /board/delegados/import", s.authPIN(s.mut(s.delegadoImport)))
@@ -105,7 +201,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /board/credenciar", s.auth(s.mut(s.credenciar)))
 	mux.HandleFunc("POST /board/reissue", s.auth(s.mut(s.reissue)))
 	mux.HandleFunc("POST /board/presenca", s.auth(s.mut(s.presenca)))
-	mux.HandleFunc("POST /board/quorum", s.auth(s.mut(s.declararQuorum)))
+	mux.HandleFunc("POST /board/abertura", s.auth(s.mut(s.declararAbertura)))
 	mux.HandleFunc("POST /board/cargo/abrir", s.auth(s.mut(s.abrirCargo)))
 	mux.HandleFunc("POST /board/escrutinio/encerrar", s.auth(s.mut(s.encerrar)))
 	mux.HandleFunc("POST /board/escrutinio/proximo", s.auth(s.mut(s.proximo)))

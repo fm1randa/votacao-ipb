@@ -101,9 +101,10 @@ func (s *Server) credenciamento(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	locals, _ := s.st.Locals(ctx, cong.ID)
+	subLocals, _ := s.st.SubLocals(ctx, cong.ID)
 	s.render(w, "credenciamento.html", map[string]any{
 		"Active": "credenciamento", "Congresso": cong, "Quorum": q,
-		"Electors": electors, "Locals": locals,
+		"Electors": electors, "Locals": locals, "SubLocals": subLocals,
 	})
 }
 
@@ -340,17 +341,18 @@ func (s *Server) presenca(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/board/credenciamento", http.StatusSeeOther)
 }
 
-func (s *Server) declararQuorum(w http.ResponseWriter, r *http.Request) {
+// declararAbertura: gate computado (ADR-0010) — o store recusa sem quórum.
+func (s *Server) declararAbertura(w http.ResponseWriter, r *http.Request) {
 	cong, err := s.st.FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.st.DeclararQuorum(r.Context(), cong.ID); err != nil {
-		fail(w, err)
+	if err := s.st.DeclararAbertura(r.Context(), cong.ID); err != nil {
+		http.Error(w, err.Error(), 400)
 		return
 	}
-	s.actionDone(w, r, "/board", "Quórum declarado.", false)
+	s.actionDone(w, r, "/board", "Abertura declarada — quórum verificado.", false)
 }
 
 func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {

@@ -1,28 +1,70 @@
-{{define "setup_congresso.html"}}<!doctype html><html lang="pt-br"><head><title>Configurar congresso</title>{{template "styles"}}</head>
+{{define "setup_congresso.html"}}<!doctype html><html lang="pt-br"><head><title>Configurar eleição</title>{{template "styles"}}{{template "htmxjs"}}</head>
 <body><div class="wrap stagger">
   <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
   <p class="eyebrow">Primeira configuração · passo 2 de 3</p>
-  <h1>Dados do congresso</h1>
-  <p class="mut">Os 6 cargos da Diretoria (GTSI, Art. 26a) e a pilha de códigos de
+  <h1>Dados da eleição</h1>
+  <p class="mut">Os cargos da Diretoria (conforme o GTSI) e a pilha de códigos de
     votação são criados automaticamente.</p>
-  <form method="post" action="/board/setup/congresso">
+  <form method="post" action="/board/setup/congresso" id="f-cong">
     <div class="card">
-      <label class="mut" for="federacao">Nome da federação</label>
-      <input type="text" id="federacao" name="federacao" required autofocus
+      <label class="mut">Âmbito da eleição</label>
+      <div style="display:grid; gap:6px; margin-top:6px">
+        <label class="mut" style="display:flex; align-items:center; gap:8px">
+          <input type="radio" name="ambito" value="local" style="width:20px;height:20px;accent-color:var(--green)">
+          Sociedade local <span style="opacity:.7">(plenária de eleição — Art. 90)</span></label>
+        <label class="mut" style="display:flex; align-items:center; gap:8px">
+          <input type="radio" name="ambito" value="federacao" checked style="width:20px;height:20px;accent-color:var(--green)">
+          Federação <span style="opacity:.7">(congresso anual)</span></label>
+        <label class="mut" style="display:flex; align-items:center; gap:8px">
+          <input type="radio" name="ambito" value="sinodal" style="width:20px;height:20px;accent-color:var(--green)">
+          Confederação Sinodal <span style="opacity:.7">(congresso bienal)</span></label>
+        <label class="mut" style="display:flex; align-items:center; gap:8px">
+          <input type="radio" name="ambito" value="nacional" style="width:20px;height:20px;accent-color:var(--green)">
+          Confederação Nacional <span style="opacity:.7">(congresso quadrienal)</span></label>
+      </div>
+      <label class="mut" for="sociedade" style="display:block; margin-top:12px">Sociedade interna</label>
+      <select id="sociedade" name="sociedade"
+        style="width:100%; font-size:1rem; padding:12px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink)">
+        {{range .Sociedades}}<option value="{{.}}"{{if eq . "UMP"}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <label class="mut" for="nome" style="display:block; margin-top:12px">Nome da entidade</label>
+      <input type="text" id="nome" name="nome" required autofocus
              placeholder="ex.: Federação UMP do Presbitério X">
-      <label class="mut" for="ano" style="display:block; margin-top:12px">Ano do congresso</label>
+      <label class="mut" for="ano" style="display:block; margin-top:12px">Ano da eleição</label>
       <input type="text" id="ano" name="ano" inputmode="numeric" required value="{{.AnoDefault}}">
     </div>
-    <div class="card">
-      <h2>Cargos da diretoria</h2>
-      <p class="mut">Federações menores costumam acumular cargos — confirme a composição com o Secretário Presbiterial (o GTSI, Art. 26a, prevê a diretoria completa). Desmarque os que não serão eleitos — Presidente, Secretário e Tesoureiro são obrigatórios.</p>
-      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px">
-        <input type="checkbox" name="cargo2" value="1" checked style="width:20px;height:20px;accent-color:var(--green)"> Vice-presidente</label>
-      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px">
-        <input type="checkbox" name="cargo3" value="1" checked style="width:20px;height:20px;accent-color:var(--green)"> Secretário Executivo</label>
-      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px">
-        <input type="checkbox" name="cargo5" value="1" checked style="width:20px;height:20px;accent-color:var(--green)"> 2º Secretário <span style="opacity:.7">(sem ele, o 1º vira só "Secretário")</span></label>
+    <div id="cargos-preset"
+         hx-get="/board/setup/cargos" hx-trigger="change from:#f-cong [name=ambito], change from:#sociedade"
+         hx-include="#f-cong" hx-swap="innerHTML">
+      {{template "cargosPreset" .}}
     </div>
     <button type="submit">Continuar</button>
   </form>
 </div></body></html>{{end}}
+
+{{/* Bloco de cargos do preset (âmbito × sociedade) — recarregado via htmx. */}}
+{{define "cargosPreset"}}
+  <div class="card">
+    <h2>Cargos da diretoria</h2>
+    {{if eq .Ambito "local"}}
+      <p class="mut">O GTSI da sociedade local permite reduzir a diretoria a
+        Presidente, Secretário(a) e Tesoureiro(a) em casos especiais (Art. 13).
+        Desmarque os cargos que não serão eleitos.</p>
+    {{else if eq .Ambito "nacional"}}
+      <p class="mut">A diretoria da Confederação Nacional é prescritiva (Art. 26b):
+        todos os cargos abaixo serão eleitos, incluindo os vices regionais.</p>
+    {{else}}
+      <p class="mut">Entidades menores costumam acumular cargos — confirme a composição
+        com o Secretário de Causas (o GTSI, Art. 26a, prevê a diretoria completa).
+        Desmarque os que não serão eleitos.</p>
+    {{end}}
+    {{range .Presets}}
+      <label class="mut" style="display:flex; align-items:center; gap:8px; margin-top:6px{{if not .Optional}}; opacity:.65{{end}}">
+        <input type="checkbox" name="cargo_{{.Role}}" value="1" checked
+          {{if not .Optional}}disabled{{end}} style="width:20px;height:20px;accent-color:var(--green)">
+        {{.Nome}}{{if not .Optional}} <span style="opacity:.7">(obrigatório)</span>{{end}}
+        {{if eq .Role "segundo_sec"}}<span style="opacity:.7">(sem ele, o 1º vira só "Secretário(a)")</span>{{end}}
+      </label>
+    {{end}}
+  </div>
+{{end}}

@@ -1,8 +1,8 @@
-{{define "delegado_login.html"}}<!doctype html><html lang="pt-br"><head><title>Área do delegado</title>{{template "styles"}}</head>
+{{define "delegado_login.html"}}<!doctype html><html lang="pt-br"><head><title>Área do {{term "votante"}}</title>{{template "styles"}}</head>
 <body><div class="wrap stagger">
   <div class="brand brand--sm"><img src="/assets/img/logo_ipb.png" alt="IPB"></div>
   <p class="eyebrow">Operação</p>
-  <h1>Área do delegado</h1>
+  <h1>Área do {{term "votante"}}</h1>
   {{if .Erro}}<div class="erro">Código inválido. Confira com a mesa.</div>{{end}}
   <form method="post" action="/delegado/login" id="f">
     <input type="hidden" name="token" id="tokenField">
