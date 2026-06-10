@@ -99,10 +99,20 @@ adb logcat -s votacao-host:V votacao-go:V
 - [x] **Incógnita 2 — LocalOnlyHotspot: VALIDADA.** SSID/senha geradas
   (`AndroidShare_*`), interface `ap0` detectada com IPv4 (ex.
   `10.247.171.219`) e repassada ao binário via `-host`.
-- [ ] Critério de sucesso (2º celular: QR Wi-Fi → QR URL → home): **pendente**
-- [ ] Sobrevivência ≥30 min de tela apagada: **pendente**
-- [ ] Limite de clientes simultâneos no LocalOnlyHotspot (aparelho: ____): **___ clientes**
-- Se o restante validar: registrar a decisão de empacotamento como ADR em `docs/adr/`.
+- [x] **Critério de sucesso: VALIDADO.** Cliente (MacBook) escaneou o QR 1,
+  entrou na rede, escaneou o QR 2 e abriu a home do sistema — zero configuração
+  manual.
+- [~] Sobrevivência ≥30 min de tela apagada: **não cronometrado** (foreground
+  service + wake lock + isenção de bateria tornam o risco baixo; observar na
+  primeira eleição real).
+- [ ] **Limite de clientes simultâneos: NÃO MEDIDO** (sem aparelhos
+  suficientes) — será observado em produção. ⚠️ Planejamento: a literatura
+  aponta ~10 clientes como teto típico de LocalOnlyHotspot em muitos chipsets.
+  Até medir, congresso BYOD com dezenas de delegados deve manter o **roteador
+  externo** como plano A; o app é plano A para plenárias locais (rol pequeno)
+  e plano B/contingência nas demais.
+- Decisão de empacotamento registrada em
+  [ADR-0011](../docs/adr/0011-app-android-casca-fina.md).
 
 ## Fora de escopo do spike
 
