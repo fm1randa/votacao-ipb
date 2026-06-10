@@ -36,6 +36,11 @@ class ServerService : Service() {
         const val PORT = 8090
         const val ACTION_STATE = "app.votacao.host.STATE"
 
+        // Modos de rede (extra MODE do Intent): criar hotspot ou usar a rede atual.
+        const val EXTRA_MODE = "mode"
+        const val MODE_HOTSPOT = "hotspot"
+        const val MODE_EXISTING = "existing"
+
         // Último estado conhecido — a Activity lê ao (re)abrir.
         @Volatile
         var lastState: HostState? = null
@@ -63,8 +68,16 @@ class ServerService : Service() {
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$TAG:server")
             .apply { acquire() }
 
-        publish(HostState("Criando a rede Wi-Fi…", running = false))
-        startHotspot()
+        if (intent?.getStringExtra(EXTRA_MODE) == MODE_EXISTING) {
+            // Modo "usar a rede atual": Wi-Fi da igreja ou o hotspot do sistema
+            // (este último permite SSID/senha personalizados nas configurações
+            // do Android — ex.: "Congresso_9440"). O app não cria nada.
+            publish(HostState("Procurando a rede atual…", running = false))
+            thread { bootServer(ssid = null, pass = null, preferHotspotIface = false) }
+        } else {
+            publish(HostState("Criando a rede Wi-Fi…", running = false))
+            startHotspot()
+        }
         return START_NOT_STICKY
     }
 
@@ -81,7 +94,7 @@ class ServerService : Service() {
                     val (ssid, pass) = credentials(reservation)
                     Log.i(TAG, "hotspot no ar: ssid=$ssid")
                     publish(HostState("Rede criada. Localizando o IP…", false, ssid, pass))
-                    thread { bootServer(ssid, pass) }
+                    thread { bootServer(ssid, pass, preferHotspotIface = true) }
                 }
 
                 override fun onFailed(reason: Int) {
@@ -127,20 +140,29 @@ class ServerService : Service() {
         }
     }
 
-    /** Espera a interface do hotspot subir e devolve o IPv4 dela. */
-    private fun hotspotIp(): String? {
+    // Devolve o IPv4 da interface onde servir.
+    //  - preferHotspotIface=true (modo hotspot): espera a iface do LocalOnlyHotspot
+    //    subir (ap*, swlan*, wlan1) — nunca a wlan0.
+    //  - false (modo rede atual): se houver hotspot do sistema ligado (ap*, swlan*),
+    //    usa ele; senão a rede Wi-Fi em que o celular está (wlan0 ou qualquer
+    //    IPv4 privado).
+    private fun serverIp(preferHotspotIface: Boolean): String? {
         repeat(20) {
             val candidates = NetworkInterface.getNetworkInterfaces().toList()
                 .filter { it.isUp && !it.isLoopback }
                 .flatMap { ni -> ni.inetAddresses.toList().map { ni.name to it } }
                 .filter { (_, a) -> a.isSiteLocalAddress && a.hostAddress?.contains('.') == true }
-            // A iface do LocalOnlyHotspot costuma chamar ap*/swlan*/wlan1.
-            val ap = candidates.firstOrNull { (name, _) ->
+            val apIface = candidates.firstOrNull { (name, _) ->
                 name.startsWith("ap") || name.startsWith("swlan") || name == "wlan1"
-            } ?: candidates.firstOrNull { (name, _) -> name != "wlan0" }
-            if (ap != null) {
-                Log.i(TAG, "iface do hotspot: ${ap.first} -> ${ap.second.hostAddress}")
-                return ap.second.hostAddress
+            }
+            val pick = if (preferHotspotIface) {
+                apIface ?: candidates.firstOrNull { (name, _) -> name != "wlan0" }
+            } else {
+                apIface ?: candidates.firstOrNull()
+            }
+            if (pick != null) {
+                Log.i(TAG, "iface escolhida: ${pick.first} -> ${pick.second.hostAddress}")
+                return pick.second.hostAddress
             }
             Thread.sleep(500)
         }
@@ -151,10 +173,14 @@ class ServerService : Service() {
     // Incógnita 1: exec() do binário Go vindo do APK
     // ------------------------------------------------------------------
 
-    private fun bootServer(ssid: String?, pass: String?) {
-        val ip = hotspotIp()
+    private fun bootServer(ssid: String?, pass: String?, preferHotspotIface: Boolean) {
+        val ip = serverIp(preferHotspotIface)
         if (ip == null) {
-            publish(HostState("Rede criada, mas não achei o IP da interface.", false, ssid, pass))
+            val msg = if (preferHotspotIface)
+                "Rede criada, mas não achei o IP da interface."
+            else
+                "Sem rede: conecte o celular a um Wi-Fi (ou ligue o hotspot do sistema) e tente de novo."
+            publish(HostState(msg, false, ssid, pass))
             return
         }
         val exe = File(applicationInfo.nativeLibraryDir, "libvotacao.so")
@@ -183,7 +209,11 @@ class ServerService : Service() {
         val url = "http://$ip:$PORT/"
         if (waitHealthy()) {
             Log.i(TAG, "servidor saudável em $url")
-            publish(HostState("Servidor no ar. Aponte a câmera para os QR codes.", true, ssid, pass, url))
+            val msg = if (ssid != null)
+                "Servidor no ar. Aponte a câmera para os QR codes."
+            else
+                "Servidor no ar na rede atual. Conecte os aparelhos à MESMA rede e aponte para o QR."
+            publish(HostState(msg, true, ssid, pass, url))
             updateNotification("Servindo em $url")
         } else {
             publish(HostState("O servidor não respondeu na porta $PORT.", false, ssid, pass, url))

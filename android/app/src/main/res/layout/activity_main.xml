@@ -26,6 +26,24 @@
             android:gravity="center"
             android:text="@string/parado" />
 
+        <RadioGroup
+            android:id="@+id/modeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp">
+            <RadioButton
+                android:id="@+id/modeHotspot"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/modo_hotspot" />
+            <RadioButton
+                android:id="@+id/modeExisting"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/modo_existente" />
+        </RadioGroup>
+
         <Button
             android:id="@+id/toggle"
             android:layout_width="match_parent"

@@ -9,6 +9,27 @@ do sistema. Objetivo: zero configuração manual pra Mesa.
 > Termux, vindo do APK; (b) LocalOnlyHotspot com QR de pareamento. Resultados
 > e limites medidos ficam documentados no fim deste arquivo.
 
+## Modos de rede
+
+O app tem dois modos (seletor na tela inicial; a escolha é lembrada):
+
+1. **Criar rede Wi-Fi (hotspot automático)** — o LocalOnlyHotspot do Android.
+   Zero configuração, mas o **nome e a senha são gerados pelo sistema**
+   (`AndroidShare_XXXX`) — a API pública não permite personalizá-los (a
+   variante com `SoftApConfiguration` é restrita a apps de sistema).
+2. **Usar a rede atual** — o app não cria nada: serve na rede em que o celular
+   já está. Cobre dois cenários:
+   - **Wi-Fi do local** (ex.: o da igreja): conecte o celular ao Wi-Fi e toque
+     Iniciar. Só o QR da URL é exibido — os aparelhos entram na mesma rede por
+     conta própria. ⚠️ Roteadores de igreja às vezes têm **isolamento de
+     clientes (AP isolation)**: um celular não enxerga o outro e o sistema não
+     abre. **Teste antes do evento**; se isolar, use o hotspot.
+   - **Hotspot do sistema com nome personalizado** (ex.: `Congresso_9440` /
+     senha `123456789`): configure uma vez em *Configurações → Ponto de acesso
+     Wi-Fi* (nome e senha que quiser), ligue o hotspot, e use este modo — o app
+     detecta a interface (`ap*`/`swlan*`) e serve nela. É o caminho para SSID
+     customizado, já que a API não deixa o app criar hotspot com nome próprio.
+
 ## Como funciona
 
 - `build-go.sh` compila o servidor da raiz (`GOOS=linux GOARCH=arm64
@@ -79,7 +100,9 @@ adb logcat -s votacao-host:V votacao-go:V
 
 | Sintoma | Causa provável |
 |---|---|
-| "Falha ao criar a rede: sem canal/modo incompatível" | Hotspot comum ligado, ou Wi-Fi desligado |
+| "Falha ao criar a rede: sem canal/modo incompatível" | Hotspot comum ligado, ou Wi-Fi desligado (modo "criar rede") |
+| "Sem rede: conecte o celular a um Wi-Fi…" | Modo "rede atual" sem Wi-Fi conectado nem hotspot do sistema ligado |
+| Cliente na mesma rede não abre a URL | AP isolation no roteador do local — teste outro roteador ou use o hotspot |
 | `SecurityException` ao iniciar | Permissão negada ou Localização desligada (≤ Android 12) |
 | "Binário do servidor não está no APK" | Faltou rodar `./android/build-go.sh` antes do `gradle` |
 | Servidor morre com a tela apagada | Isenção de bateria não concedida (botão na tela) |

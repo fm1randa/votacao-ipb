@@ -10,5 +10,7 @@
     <string name="bateria_ok">Já liberado da otimização de bateria.</string>
     <string name="passo1">1. Entre na rede Wi-Fi</string>
     <string name="passo2">2. Abra o sistema</string>
-    <string name="wifi_info">Rede: %1$s\nSenha: %2$s</string>
+    <string name="wifi_info">SSID: %1$s\nSenha: %2$s</string>
+    <string name="modo_hotspot">Criar rede Wi-Fi (hotspot automático)</string>
+    <string name="modo_existente">Usar a rede atual (Wi-Fi do local ou hotspot do sistema)</string>
 </resources>

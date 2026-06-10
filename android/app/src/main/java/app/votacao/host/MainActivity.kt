@@ -16,6 +16,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.RadioGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -28,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var status: TextView
     private lateinit var toggle: Button
+    private lateinit var modeGroup: RadioGroup
     private lateinit var wifiCard: LinearLayout
     private lateinit var urlCard: LinearLayout
     private lateinit var wifiQr: ImageView
@@ -36,6 +38,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var urlInfo: TextView
 
     private var running = false
+
+    /** Modo escolhido (lembrado entre usos). */
+    private fun mode(): String =
+        if (modeGroup.checkedRadioButtonId == R.id.modeExisting)
+            ServerService.MODE_EXISTING else ServerService.MODE_HOTSPOT
 
     private val askPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -55,12 +62,22 @@ class MainActivity : AppCompatActivity() {
 
         status = findViewById(R.id.status)
         toggle = findViewById(R.id.toggle)
+        modeGroup = findViewById(R.id.modeGroup)
         wifiCard = findViewById(R.id.wifiCard)
         urlCard = findViewById(R.id.urlCard)
         wifiQr = findViewById(R.id.wifiQr)
         urlQr = findViewById(R.id.urlQr)
         wifiInfo = findViewById(R.id.wifiInfo)
         urlInfo = findViewById(R.id.urlInfo)
+
+        // Lembra o último modo escolhido.
+        val prefs = getSharedPreferences("host", MODE_PRIVATE)
+        if (prefs.getString("mode", ServerService.MODE_HOTSPOT) == ServerService.MODE_EXISTING) {
+            modeGroup.check(R.id.modeExisting)
+        }
+        modeGroup.setOnCheckedChangeListener { _, _ ->
+            prefs.edit().putString("mode", mode()).apply()
+        }
 
         toggle.setOnClickListener {
             if (running) {
@@ -88,13 +105,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ensurePermissionsThenStart() {
+        val criarRede = mode() == ServerService.MODE_HOTSPOT
         val needed = buildList {
-            if (Build.VERSION.SDK_INT >= 33) {
-                add(Manifest.permission.NEARBY_WIFI_DEVICES)
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            // Permissões de hotspot só no modo "criar rede"; usar a rede atual
+            // não exige localização/NEARBY.
+            if (criarRede) {
+                if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+                else add(Manifest.permission.ACCESS_FINE_LOCATION)
             }
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
         }.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
@@ -103,7 +122,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun startServer() {
         status.text = getString(R.string.iniciando)
-        ContextCompat.startForegroundService(this, Intent(this, ServerService::class.java))
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, ServerService::class.java)
+                .putExtra(ServerService.EXTRA_MODE, mode()),
+        )
     }
 
     /** Isenção de otimização de bateria — servidor vivo ≥30min de tela apagada. */
@@ -124,6 +147,8 @@ class MainActivity : AppCompatActivity() {
         running = st?.running == true
         toggle.text = getString(if (running) R.string.parar else R.string.iniciar)
         status.text = st?.status ?: getString(R.string.parado)
+        // Modo não muda com o servidor no ar (pare antes de trocar).
+        for (i in 0 until modeGroup.childCount) modeGroup.getChildAt(i).isEnabled = !running
 
         val temWifi = st?.ssid != null && st.password != null
         wifiCard.visibility = if (temWifi) LinearLayout.VISIBLE else LinearLayout.GONE
