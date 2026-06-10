@@ -198,10 +198,14 @@ class ServerService : Service() {
             publish(HostState("Falha ao executar o servidor: ${e.message}", false, ssid, pass))
             return
         }
-        // Logs do Go vão pro logcat com a tag votacao-go.
+        // Logs do Go vão pro logcat com a tag votacao-go. Tudo em runCatching:
+        // exceção solta em QUALQUER thread derruba o app no Android — e o
+        // destroy() do Parar fecha o stream no meio da leitura (IOException).
         thread {
-            process?.inputStream?.bufferedReader()?.forEachLine { Log.i(GO_TAG, it) }
-            val code = process?.waitFor()
+            runCatching {
+                process?.inputStream?.bufferedReader()?.forEachLine { Log.i(GO_TAG, it) }
+            }
+            val code = runCatching { process?.waitFor() }.getOrNull()
             Log.w(TAG, "servidor terminou (exit=$code)")
             if (!stopping) publish(HostState("O servidor encerrou inesperadamente (exit=$code).", false, ssid, pass))
         }
@@ -270,9 +274,9 @@ class ServerService : Service() {
 
     override fun onDestroy() {
         stopping = true
-        process?.destroy()
-        hotspot?.close()
-        wakeLock?.takeIf { it.isHeld }?.release()
+        runCatching { process?.destroy() }
+        runCatching { hotspot?.close() }
+        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
         publish(HostState("Servidor parado.", false))
         super.onDestroy()
     }
