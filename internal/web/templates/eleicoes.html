@@ -19,7 +19,7 @@
     <div class="card" {{if eq .File $ativa}}style="border-color:var(--green)"{{end}}>
       <div class="row" style="align-items:flex-start">
         <div>
-          <strong>{{if .Configurada}}{{entidadeDe .Sociedade .Nome}} · {{.Ano}}{{else}}Eleição em branco{{end}}</strong>
+          <strong>{{if .Configurada}}{{entidadeDe .Ambito .Sociedade .Nome}} · {{.Ano}}{{else}}Eleição em branco{{end}}</strong>
           {{if eq .File $ativa}}<span class="pill on">ativa</span>{{end}}
           {{if .Configurada}}
             {{if .Encerrada}}<span class="pill off">encerrada</span>
@@ -41,9 +41,9 @@
           <a class="btn ghost sm" href="/board">Ir para a Mesa</a>
         {{end}}
         <button type="button" class="ghost sm" data-acao="resetar"
-          data-file="{{.File}}" data-nome="{{if .Configurada}}{{.Nome}}{{end}}">Resetar</button>
+          data-file="{{.File}}" data-nome="{{if .Configurada}}{{entidadeDe .Ambito .Sociedade .Nome}}{{end}}">Resetar</button>
         <button type="button" class="ghost sm" style="color:var(--bad); border-color:color-mix(in srgb, var(--bad) 40%, var(--line))"
-          data-acao="excluir" data-file="{{.File}}" data-nome="{{if .Configurada}}{{.Nome}}{{end}}">Excluir</button>
+          data-acao="excluir" data-file="{{.File}}" data-nome="{{if .Configurada}}{{entidadeDe .Ambito .Sociedade .Nome}}{{end}}">Excluir</button>
       </div>
     </div>
     {{end}}

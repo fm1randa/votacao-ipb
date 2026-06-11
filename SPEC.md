@@ -291,6 +291,12 @@ que varia é configuração e vocabulário.
 - O wizard ganha **dois seletores**: **âmbito** e **sociedade**. A sociedade
   define os rótulos dos cargos (gênero — SAF: "Secretária Executiva",
   "Tesoureira") e o preset de vices da Nacional; o âmbito define o resto.
+- **O campo de nome guarda só a entidade-mãe** [decisão 2026-06-11], com rótulo
+  por âmbito: Local "Nome da igreja" · Federação "Nome do presbitério" ·
+  Sinodal "Nome do sínodo" · Nacional **sem campo** (a entidade é única). O
+  nome de exibição é montado pelo sistema: "UMP da IPB Cordovil" · "Federação
+  de UMPs do PRNT" · "Sinodal de UMPs do sínodo SNT" · "Nacional de UMPs".
+  A fricção do gerenciador (Resetar/Excluir) usa o nome de exibição.
 - **Mutável só antes da Declaração de Abertura** (logo, sem votos): a troca em
   Ajustes re-aplica o preset de cargos com modal de confirmação e entra no
   Histórico (restaurável). Depois da abertura, bloqueado.

@@ -25,8 +25,13 @@
         {{if .Congresso.AberturaDeclarada}}
           <p class="mut" style="margin-top:8px">A abertura já foi declarada — âmbito e sociedade não podem mais mudar (SPEC §10).</p>
         {{end}}
-        <label class="mut" for="nome" style="display:block; margin-top:12px">Nome da entidade</label>
-        <input type="text" id="nome" name="nome" required value="{{.Congresso.Nome}}">
+        {{$nac := eq .Congresso.Ambito "nacional"}}
+        <label class="mut" for="nome" id="aj-nome-rotulo" style="display:{{if $nac}}none{{else}}block{{end}}; margin-top:12px">
+          {{- if eq .Congresso.Ambito "local"}}Nome da igreja
+          {{- else if eq .Congresso.Ambito "sinodal"}}Nome do sínodo
+          {{- else}}Nome do presbitério{{end}}</label>
+        <input type="text" id="nome" name="nome" value="{{.Congresso.Nome}}"
+          {{if not $nac}}required{{else}}style="display:none"{{end}}>
         <label class="mut" for="ano" style="display:block; margin-top:12px">Ano</label>
         <input type="text" id="ano" name="ano" inputmode="numeric" required value="{{.Congresso.Ano}}">
       </div>
@@ -35,14 +40,26 @@
     </form>
     <script>
       // Trocar âmbito/sociedade re-aplica o preset de cargos — pede confirmação.
+      // O campo de nome acompanha o âmbito (Nacional não tem nome).
       (function(){
         var f = document.getElementById('f-ajustes');
         var amb = document.getElementById('aj-ambito'), soc = document.getElementById('aj-soc');
         var orig = amb.value + '|' + soc.value;
+        var rotulos = {
+          local:     ['Nome da igreja',      'ex.: IPB Cordovil'],
+          federacao: ['Nome do presbitério', 'ex.: PRNT'],
+          sinodal:   ['Nome do sínodo',      'ex.: SNT']
+        };
         function sync(){
           if (amb.value + '|' + soc.value !== orig) {
             f.setAttribute('hx-confirm', 'Trocar âmbito/sociedade redefine os cargos da diretoria (o rol é mantido). Continuar?');
           } else { f.removeAttribute('hx-confirm'); }
+          var rot = rotulos[amb.value];
+          var lbl = document.getElementById('aj-nome-rotulo'), inp = document.getElementById('nome');
+          lbl.style.display = rot ? 'block' : 'none';
+          inp.style.display = rot ? '' : 'none';
+          inp.required = !!rot;
+          if (rot) { lbl.textContent = rot[0]; inp.placeholder = rot[1]; }
         }
         amb.addEventListener('change', sync); soc.addEventListener('change', sync);
       })();

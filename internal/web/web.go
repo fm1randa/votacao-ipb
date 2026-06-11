@@ -155,13 +155,24 @@ func (s *Server) term(key string) string {
 	return key
 }
 
-// entidadeNome prefixa a sociedade ao nome da entidade ("UMP IPB Cordovil") —
-// a menos que o nome já a mencione ("Federação UMP do PRNT"), evitando eco.
-func entidadeNome(sociedade, nome string) string {
-	if sociedade == "" || strings.Contains(strings.ToUpper(nome), strings.ToUpper(sociedade)) {
-		return nome
+// entidadeNome monta o nome de exibição por âmbito (SPEC §10.1). O campo
+// `nome` guarda só a entidade-mãe (igreja, presbitério ou sínodo); a Nacional
+// é única e não tem nome:
+//   local      → "UMP da IPB Cordovil"
+//   federacao  → "Federação de UMPs do PRNT"
+//   sinodal    → "Sinodal de UMPs do sínodo SNT"
+//   nacional   → "Nacional de UMPs"
+func entidadeNome(ambito, sociedade, nome string) string {
+	switch ambito {
+	case store.AmbitoLocal:
+		return strings.TrimSpace(sociedade + " da " + nome)
+	case store.AmbitoSinodal:
+		return strings.TrimSpace("Sinodal de " + sociedade + "s do sínodo " + nome)
+	case store.AmbitoNacional:
+		return "Nacional de " + sociedade + "s"
+	default: // federação
+		return strings.TrimSpace("Federação de " + sociedade + "s do " + nome)
 	}
-	return sociedade + " " + nome
 }
 
 func New(mgr *store.Elections, st *store.Store, addr, host string) (*Server, error) {
@@ -171,10 +182,10 @@ func New(mgr *store.Elections, st *store.Store, addr, host string) (*Server, err
 		"term":      s.term,
 		"ambito":    func() string { return s.cong().Ambito },
 		"sociedade": func() string { return s.cong().Sociedade },
-		// entidade: nome de exibição da entidade, com a sociedade à esquerda
-		// ("UMP IPB Cordovil"). entidadeDe é a variante para listas (gerenciador),
-		// onde cada item tem a própria sociedade.
-		"entidade":   func() string { c := s.cong(); return entidadeNome(c.Sociedade, c.Nome) },
+		// entidade: nome de exibição da eleição ativa ("UMP da IPB Cordovil").
+		// entidadeDe é a variante para listas (gerenciador), onde cada item
+		// tem o próprio âmbito e sociedade.
+		"entidade":   func() string { c := s.cong(); return entidadeNome(c.Ambito, c.Sociedade, c.Nome) },
 		"entidadeDe": entidadeNome,
 		// dataBR: exibe data ISO (banco) como DD/MM/AAAA.
 		"dataBR": func(iso string) string {

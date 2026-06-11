@@ -9,6 +9,8 @@
     <svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg><span>Relatório</span></a>
   <a class="navitem {{if eq .Active "historico"}}active{{end}}" href="/board/historico">
     <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v3.5h3.5"/><path d="M12 8v4l3 2"/></svg><span>Histórico</span></a>
+  <a class="navitem {{if eq .Active "ajustes"}}active{{end}}" href="/board/ajustes">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"/></svg><span>Ajustes</span></a>
 {{end}}
 
 {{define "mesanav"}}

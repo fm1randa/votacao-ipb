@@ -124,7 +124,8 @@ func main() {
 // delegados, o preset de cargos (Art. 26a) e a pilha de tokens.
 func semear(st *store.Store, n int) error {
 	ctx := context.Background()
-	cong, err := st.CreateCongress(ctx, store.AmbitoFederacao, "UMP", "Federação UMP de Exemplo", 2026)
+	// O nome guarda só a entidade-mãe: exibe-se "Federação de UMPs do <nome>".
+	cong, err := st.CreateCongress(ctx, store.AmbitoFederacao, "UMP", "Presbitério de Exemplo", 2026)
 	if err != nil {
 		return err
 	}

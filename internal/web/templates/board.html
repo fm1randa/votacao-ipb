@@ -4,12 +4,7 @@
   {{template "mesanav" .}}
   <main class="content"><div class="wrap has-bottomnav">
     <p class="eyebrow">{{entidade}} · {{.Congresso.Ano}}</p>
-    <div class="row">
-      <h1>Escrutínio</h1>
-      <a href="/board/ajustes" aria-label="Ajustes" title="Ajustes" class="mut" style="display:inline-flex">
-        <svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8">
-          <circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"/></svg></a>
-    </div>
+    <h1>Escrutínio</h1>
     <div hx-ext="sse" sse-connect="/events">
       <div hx-get="/board/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
         {{template "boardLive" .}}

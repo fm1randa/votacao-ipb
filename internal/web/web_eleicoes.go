@@ -72,14 +72,15 @@ func (s *Server) eleicaoAbrir(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/board", http.StatusSeeOther)
 }
 
-// confirmaNome aplica a fricção: para Eleições configuradas, o nome digitado
-// precisa bater exatamente com o nome da entidade. Não configuradas (vazias)
-// dispensam — não há nada a perder nem nome a digitar.
+// confirmaNome aplica a fricção: para Eleições configuradas, o digitado precisa
+// bater exatamente com o nome de EXIBIÇÃO ("UMP da IPB Cordovil") — é o que a
+// Mesa vê na lista, e cobre a Nacional, cujo campo nome é vazio. Não
+// configuradas (vazias) dispensam — não há nada a perder nem nome a digitar.
 func confirmaNome(info store.ElectionInfo, digitado string) bool {
 	if !info.Configurada {
 		return true
 	}
-	return strings.TrimSpace(digitado) == info.Nome
+	return strings.TrimSpace(digitado) == entidadeNome(info.Ambito, info.Sociedade, info.Nome)
 }
 
 func (s *Server) eleicaoResetar(w http.ResponseWriter, r *http.Request) {

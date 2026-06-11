@@ -99,8 +99,12 @@ func (s *Server) setupCongresso(w http.ResponseWriter, r *http.Request) {
 	ambito := r.FormValue("ambito")
 	sociedade := r.FormValue("sociedade")
 	nome := strings.TrimSpace(r.FormValue("nome"))
+	if ambito == store.AmbitoNacional {
+		nome = "" // a Nacional é única — não há entidade-mãe a nomear
+	}
 	ano, _ := strconv.Atoi(r.FormValue("ano"))
-	if nome == "" || ano < 2000 || !store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
+	if (nome == "" && ambito != store.AmbitoNacional) || ano < 2000 ||
+		!store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
 		http.Redirect(w, r, "/board/setup", http.StatusSeeOther)
 		return
 	}
@@ -332,7 +336,7 @@ func (s *Server) ajustes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "ajustes.html", map[string]any{
-		"Active": "", "Congresso": cong, "Positions": positions,
+		"Active": "ajustes", "Congresso": cong, "Positions": positions,
 		"Sociedades": store.Sociedades,
 	})
 }
@@ -401,8 +405,12 @@ func (s *Server) ajustesSave(w http.ResponseWriter, r *http.Request) {
 		ambito, sociedade = cong.Ambito, cong.Sociedade
 	}
 	nome := strings.TrimSpace(r.FormValue("nome"))
+	if ambito == store.AmbitoNacional {
+		nome = "" // a Nacional é única — não há entidade-mãe a nomear
+	}
 	ano, _ := strconv.Atoi(r.FormValue("ano"))
-	if nome == "" || ano < 2000 || !store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
+	if (nome == "" && ambito != store.AmbitoNacional) || ano < 2000 ||
+		!store.ValidAmbito(ambito) || !store.ValidSociedade(sociedade) {
 		http.Error(w, "informe nome, ano, âmbito e sociedade válidos", 400)
 		return
 	}

@@ -34,9 +34,12 @@
         style="width:100%; font-size:1rem; padding:12px; border-radius:12px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink)">
         {{range .Sociedades}}<option value="{{.}}"{{if eq . "UMP"}} selected{{end}}>{{.}}</option>{{end}}
       </select>
-      <label class="mut" for="nome" style="display:block; margin-top:12px">Nome da entidade</label>
+      <!-- O rótulo acompanha o âmbito (igreja/presbitério/sínodo); a Nacional
+           é única e dispensa o campo. O nome de exibição é montado pelo
+           sistema: "UMP da IPB Cordovil", "Federação de UMPs do PRNT"... -->
+      <label class="mut" for="nome" id="nome-rotulo" style="display:block; margin-top:12px">Nome do presbitério</label>
       <input type="text" id="nome" name="nome" required autofocus
-             placeholder="ex.: Federação UMP do Presbitério X">
+             placeholder="ex.: PRNT">
       <label class="mut" for="ano" style="display:block; margin-top:12px">Ano da eleição</label>
       <input type="text" id="ano" name="ano" inputmode="numeric" required value="{{.AnoDefault}}">
     </div>
@@ -46,10 +49,26 @@
     <button type="submit">Continuar</button>
   </form>
   <script>
-    // Trocar âmbito/sociedade recarrega o bloco de cargos (o preset muda).
+    // Trocar âmbito/sociedade recarrega o bloco de cargos (o preset muda)
+    // e ajusta o campo de nome (rótulo por âmbito; Nacional não tem nome).
+    var nomeRotulos = {
+      local:     ['Nome da igreja',      'ex.: IPB Cordovil'],
+      federacao: ['Nome do presbitério', 'ex.: PRNT'],
+      sinodal:   ['Nome do sínodo',      'ex.: SNT']
+    };
+    function syncNome(){
+      var amb = document.querySelector('#f-cong [name=ambito]:checked').value;
+      var rot = nomeRotulos[amb];
+      var lbl = document.getElementById('nome-rotulo'), inp = document.getElementById('nome');
+      lbl.style.display = rot ? '' : 'none';
+      inp.style.display = rot ? '' : 'none';
+      inp.required = !!rot;
+      if (rot) { lbl.textContent = rot[0]; inp.placeholder = rot[1]; }
+    }
     function reloadCargos(){
       var amb = document.querySelector('#f-cong [name=ambito]:checked').value;
       var soc = document.getElementById('sociedade').value;
+      syncNome();
       htmx.ajax('GET', '/board/setup/cargos?ambito=' + amb + '&sociedade=' + encodeURIComponent(soc),
         { target: '#cargos-preset', swap: 'innerHTML' });
     }
