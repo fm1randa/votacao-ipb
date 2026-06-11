@@ -46,6 +46,12 @@ func (s *Store) PINHash(ctx context.Context) (string, error) {
 	return s.GetSetting(ctx, settingPINHash)
 }
 
+// SetPINHash grava um hash já calculado — usado para propagar o PIN da Mesa
+// ao criar uma Eleição nova (ADR-0012: um PIN só, copiado banco a banco).
+func (s *Store) SetPINHash(ctx context.Context, hash string) error {
+	return s.SetSetting(ctx, settingPINHash, hash)
+}
+
 // CheckPIN confere um PIN digitado contra o salvo.
 func (s *Store) CheckPIN(ctx context.Context, pin string) (bool, error) {
 	h, err := s.PINHash(ctx)

@@ -28,7 +28,7 @@ func (s *Server) requireDelegado(ctx context.Context, r *http.Request) string {
 	if tok == "" {
 		return ""
 	}
-	ok, err := s.st.TokenIssued(ctx, tok)
+	ok, err := s.db().TokenIssued(ctx, tok)
 	if err != nil || !ok {
 		return "" // token resetado/revogado → trata como deslogado
 	}
@@ -46,7 +46,7 @@ func (s *Server) delegadoLoginForm(w http.ResponseWriter, r *http.Request) {
 func (s *Server) delegadoLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	tok := strings.ToUpper(strings.Join(strings.Fields(r.FormValue("token")), ""))
-	ok, err := s.st.TokenIssued(r.Context(), tok)
+	ok, err := s.db().TokenIssued(r.Context(), tok)
 	if err != nil {
 		fail(w, err)
 		return
@@ -69,17 +69,17 @@ func (s *Server) delegadoLogout(w http.ResponseWriter, r *http.Request) {
 
 // delegadoData monta o estado do hub: "aberta", "fechada" ou "votou".
 func (s *Server) delegadoData(ctx context.Context, token string) (map[string]any, error) {
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		return nil, err
 	}
 	data := map[string]any{"Congresso": cong, "Estado": "fechada"}
-	round, pos, open, err := s.st.OpenRound(ctx, cong.ID)
+	round, pos, open, err := s.db().OpenRound(ctx, cong.ID)
 	if err != nil {
 		return nil, err
 	}
 	if open {
-		voted, err := s.st.HasVoted(ctx, round.ID, token)
+		voted, err := s.db().HasVoted(ctx, round.ID, token)
 		if err != nil {
 			return nil, err
 		}

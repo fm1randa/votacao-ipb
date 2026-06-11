@@ -333,3 +333,28 @@ que varia é configuração e vocabulário.
   Federação; Nascimento`.
 - **Checagens sem dado seguem manuais:** "membro da IPB há +1 ano" (Art. 91c) e
   afins continuam com a Comissão de Diplomacia.
+
+## 11. Gerenciador de Eleições (grilling 2026-06-11)
+
+Gestão de múltiplas Eleições e do ciclo de vida de cada uma (ADR-0012).
+
+- **Um arquivo SQLite por Eleição [decisão]:** o servidor recebe uma **pasta de
+  dados** (`-data`; `-db` segue como atalho legado) e lista os `.db` dela. O log
+  de operações (ADR-0006) é global ao banco — o isolamento por arquivo é o que
+  mantém Desfazer/Restaurar escopados por Eleição. Backup = copiar o arquivo.
+- **Gerenciador em `/board/eleicoes`:** lista (nome, âmbito, ano, status, rol,
+  operações), **+ Nova eleição**, **Abrir** (troca a quente, sem derrubar o
+  servidor — as telas vivas re-sincronizam via SSE), **Resetar** e **Excluir**.
+- **PIN único propagado [decisão]:** criar uma Eleição copia o hash do PIN da
+  atual — na prática a Mesa tem um PIN só. Instalação nova define no wizard.
+- **Resetar [decisão]:** esvazia a Eleição por completo (rol, cargos, tokens,
+  votos, configuração) e volta ao wizard; **mantém Histórico e PIN** e grava
+  operação antes — ou seja, é **desfazível** pelo Histórico. Difere do
+  **Reiniciar** (§6A), que preserva rol e cargos.
+- **Excluir [decisão]:** apaga o arquivo (com Histórico) — **irreversível**.
+  Excluir a ativa troca para outra Eleição (ou cria uma em branco): o sistema
+  sempre tem uma Eleição ativa.
+- **Fricção [decisão]:** Resetar e Excluir exigem **digitar o nome exato** da
+  entidade (estilo GitHub). Eleições em branco dispensam (nada a perder).
+- **Boot lembra a última ativa** (meta `eleicao-ativa` na pasta); `-db`
+  explícito na linha de comando tem precedência.

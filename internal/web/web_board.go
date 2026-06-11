@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -10,15 +12,15 @@ import (
 
 // boardData monta o estado da aba "Escrutínio" (sem o Toast, que é por-requisição).
 func (s *Server) boardData(ctx context.Context) (map[string]any, error) {
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		return nil, err
 	}
-	q, err := s.st.Quorum(ctx, cong.ID)
+	q, err := s.db().Quorum(ctx, cong.ID)
 	if err != nil {
 		return nil, err
 	}
-	positions, err := s.st.Positions(ctx, cong.ID)
+	positions, err := s.db().Positions(ctx, cong.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +34,7 @@ func (s *Server) boardData(ctx context.Context) (map[string]any, error) {
 		"Active": "escrutinio", "Congresso": cong, "Quorum": q,
 		"Positions": positions, "Decididos": decididos, "Total": len(positions),
 	}
-	atual, ok, err := s.st.CurrentPosition(ctx, cong.ID)
+	atual, ok, err := s.db().CurrentPosition(ctx, cong.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,17 +50,17 @@ func (s *Server) boardData(ctx context.Context) (map[string]any, error) {
 		}
 	}
 	if atual.Status == "em_eleicao" {
-		if round, err := s.st.CurrentRound(ctx, atual.ID); err == nil {
+		if round, err := s.db().CurrentRound(ctx, atual.ID); err == nil {
 			data["Round"] = round
 			// Selo "indicação: N nomes" (só fora do runoff — lá o top-2 é regra).
 			if !round.Runoff {
-				if n, err := s.st.IndicadosCount(ctx, round.ID); err == nil && n > 0 {
+				if n, err := s.db().IndicadosCount(ctx, round.ID); err == nil && n > 0 {
 					data["Indicados"] = n
 				}
 			}
 			if round.Status == "aberto" {
 				data["PodeEncerrar"] = true
-				if res, err := s.st.Tally(ctx, round.ID); err == nil {
+				if res, err := s.db().Tally(ctx, round.ID); err == nil {
 					data["Depositados"] = res.Depositados
 					data["Presentes"] = res.Presentes
 				}
@@ -95,19 +97,19 @@ func (s *Server) boardFragment(w http.ResponseWriter, r *http.Request) {
 // credenciamento é a aba dedicada: busca (nome/igreja) + filtros + ação inline (JS no template).
 func (s *Server) credenciamento(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	q, _ := s.st.Quorum(ctx, cong.ID)
-	electors, err := s.st.Electors(ctx, cong.ID)
+	q, _ := s.db().Quorum(ctx, cong.ID)
+	electors, err := s.db().Electors(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	locals, _ := s.st.Locals(ctx, cong.ID)
-	subLocals, _ := s.st.SubLocals(ctx, cong.ID)
+	locals, _ := s.db().Locals(ctx, cong.ID)
+	subLocals, _ := s.db().SubLocals(ctx, cong.ID)
 	s.render(w, "credenciamento.html", map[string]any{
 		"Active": "credenciamento", "Congresso": cong, "Quorum": q,
 		"Electors": electors, "Locals": locals, "SubLocals": subLocals,
@@ -115,14 +117,15 @@ func (s *Server) credenciamento(w http.ResponseWriter, r *http.Request) {
 }
 
 // historico é a aba do log de operações (Desfazer/Restaurar + zona de perigo).
+// Tolera banco sem congresso (pós-Reset): o Desfazer é o caminho de volta.
 func (s *Server) historico(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
-	if err != nil {
+	cong, err := s.db().FirstCongress(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		fail(w, err)
 		return
 	}
-	ops, err := s.st.Operations(ctx)
+	ops, err := s.db().Operations(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -133,7 +136,7 @@ func (s *Server) historico(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) undo(w http.ResponseWriter, r *http.Request) {
-	if err := s.st.UndoLast(r.Context()); err != nil {
+	if err := s.db().UndoLast(r.Context()); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -176,19 +179,20 @@ func buildDiff(cur, tgt store.StateSummary) ([]diffRow, bool) {
 		n = len(cur.Cargos)
 	}
 	for i := 0; i < n; i++ {
-		var cc, tc store.CargoState
-		nome := ""
+		// Cargo ausente num dos lados (ex.: banco resetado) exibe "—", não
+		// "pendente" — senão o diff acha que nada mudou.
+		nome, de, para := "", "—", "—"
 		if i < len(tgt.Cargos) {
-			tc = tgt.Cargos[i]
-			nome = tc.Nome
+			para = statusTxt(tgt.Cargos[i])
+			nome = tgt.Cargos[i].Nome
 		}
 		if i < len(cur.Cargos) {
-			cc = cur.Cargos[i]
+			de = statusTxt(cur.Cargos[i])
 			if nome == "" {
-				nome = cc.Nome
+				nome = cur.Cargos[i].Nome
 			}
 		}
-		rows = append(rows, d(nome, statusTxt(cc), statusTxt(tc)))
+		rows = append(rows, d(nome, de, para))
 	}
 	changed := false
 	for _, r := range rows {
@@ -203,12 +207,12 @@ func buildDiff(cur, tgt store.StateSummary) ([]diffRow, bool) {
 func (s *Server) restorePreview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	opID, _ := strconv.ParseInt(r.URL.Query().Get("op_id"), 10, 64)
-	cur, err := s.st.SummarizeCurrent(ctx)
+	cur, err := s.db().SummarizeCurrent(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	tgt, desc, err := s.st.SummarizeSnapshot(ctx, opID)
+	tgt, desc, err := s.db().SummarizeSnapshot(ctx, opID)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
@@ -221,7 +225,7 @@ func (s *Server) restorePreview(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) restore(w http.ResponseWriter, r *http.Request) {
 	opID, _ := strconv.ParseInt(r.FormValue("op_id"), 10, 64)
-	if err := s.st.RestoreToOp(r.Context(), opID); err != nil {
+	if err := s.db().RestoreToOp(r.Context(), opID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -229,12 +233,12 @@ func (s *Server) restore(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) reiniciar(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.st.ReiniciarEleicao(r.Context(), cong.ID); err != nil {
+	if err := s.db().ReiniciarEleicao(r.Context(), cong.ID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -242,12 +246,12 @@ func (s *Server) reiniciar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) encerrarEleicao(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.st.EncerrarEleicao(r.Context(), cong.ID); err != nil {
+	if err := s.db().EncerrarEleicao(r.Context(), cong.ID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -255,12 +259,12 @@ func (s *Server) encerrarEleicao(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) reabrirEleicao(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.st.ReabrirEleicao(r.Context(), cong.ID); err != nil {
+	if err := s.db().ReabrirEleicao(r.Context(), cong.ID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -270,12 +274,12 @@ func (s *Server) reabrirEleicao(w http.ResponseWriter, r *http.Request) {
 // historicoFragment: a parte viva do Histórico (lista de operações + zona de perigo).
 func (s *Server) historicoFragment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
-	if err != nil {
+	cong, err := s.db().FirstCongress(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		fail(w, err)
 		return
 	}
-	ops, err := s.st.Operations(ctx)
+	ops, err := s.db().Operations(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -289,20 +293,20 @@ func (s *Server) historicoFragment(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) credenciar(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	electorID, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
-	code, err := s.st.Credenciar(ctx, cong.ID, electorID)
+	code, err := s.db().Credenciar(ctx, cong.ID, electorID)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
 	if r.Header.Get("HX-Request") == "true" {
-		el, _ := s.st.GetElector(ctx, electorID)
-		q, _ := s.st.Quorum(ctx, cong.ID)
+		el, _ := s.db().GetElector(ctx, electorID)
+		q, _ := s.db().Quorum(ctx, cong.ID)
 		w.Header().Set("HX-Trigger", `{"openToken":true}`)
 		s.render(w, "credResult", map[string]any{"Token": code, "Row": el, "Quorum": q})
 		return
@@ -312,18 +316,18 @@ func (s *Server) credenciar(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) reissue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	code, err := s.st.IssueToken(ctx, cong.ID)
+	code, err := s.db().IssueToken(ctx, cong.ID)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
 	if r.Header.Get("HX-Request") == "true" {
-		q, _ := s.st.Quorum(ctx, cong.ID)
+		q, _ := s.db().Quorum(ctx, cong.ID)
 		w.Header().Set("HX-Trigger", `{"openToken":true}`)
 		s.render(w, "credResult", map[string]any{"Token": code, "Row": nil, "Quorum": q})
 		return
@@ -335,12 +339,12 @@ func (s *Server) presenca(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	electorID, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
 	presente := r.FormValue("presente") == "1"
-	if err := s.st.SetPresente(ctx, electorID, presente); err != nil {
+	if err := s.db().SetPresente(ctx, electorID, presente); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
 	if r.Header.Get("HX-Request") == "true" {
-		el, _ := s.st.GetElector(ctx, electorID)
+		el, _ := s.db().GetElector(ctx, electorID)
 		s.render(w, "credRow", map[string]any{"E": el, "OOB": false})
 		return
 	}
@@ -349,12 +353,12 @@ func (s *Server) presenca(w http.ResponseWriter, r *http.Request) {
 
 // declararAbertura: gate computado (ADR-0010) — o store recusa sem quórum.
 func (s *Server) declararAbertura(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	if err := s.st.DeclararAbertura(r.Context(), cong.ID); err != nil {
+	if err := s.db().DeclararAbertura(r.Context(), cong.ID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -365,18 +369,18 @@ func (s *Server) declararAbertura(w http.ResponseWriter, r *http.Request) {
 // indicáveis, carregada no clique de "Com indicações…".
 func (s *Server) indicarForm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	positionID, _ := strconv.ParseInt(r.URL.Query().Get("position_id"), 10, 64)
-	pos, err := s.st.GetPosition(ctx, positionID)
+	pos, err := s.db().GetPosition(ctx, positionID)
 	if err != nil {
 		http.Error(w, "cargo não encontrado", 400)
 		return
 	}
-	electors, err := s.st.IndicaveisElectors(ctx, cong.ID)
+	electors, err := s.db().IndicaveisElectors(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -386,7 +390,7 @@ func (s *Server) indicarForm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -404,7 +408,7 @@ func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "marque ao menos um nome para indicar", 400)
 		return
 	}
-	if _, err := s.st.AbrirCargo(ctx, cong.ID, positionID, indicados); err != nil {
+	if _, err := s.db().AbrirCargo(ctx, cong.ID, positionID, indicados); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -417,7 +421,7 @@ func (s *Server) abrirCargo(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) encerrar(w http.ResponseWriter, r *http.Request) {
 	roundID, _ := strconv.ParseInt(r.FormValue("round_id"), 10, 64)
-	if _, err := s.st.EncerrarEscrutinio(r.Context(), roundID); err != nil {
+	if _, err := s.db().EncerrarEscrutinio(r.Context(), roundID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -426,7 +430,7 @@ func (s *Server) encerrar(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) proximo(w http.ResponseWriter, r *http.Request) {
 	positionID, _ := strconv.ParseInt(r.FormValue("position_id"), 10, 64)
-	if _, err := s.st.AbrirProximoEscrutinio(r.Context(), positionID); err != nil {
+	if _, err := s.db().AbrirProximoEscrutinio(r.Context(), positionID); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -436,17 +440,17 @@ func (s *Server) proximo(w http.ResponseWriter, r *http.Request) {
 // report monta a saída imprimível: Verificação de Poderes + resultado de cada escrutínio.
 func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	q, err := s.st.Quorum(ctx, cong.ID)
+	q, err := s.db().Quorum(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	positions, err := s.st.Positions(ctx, cong.ID)
+	positions, err := s.db().Positions(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -458,14 +462,14 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 	}
 	var cargos []cargoReport
 	for _, p := range positions {
-		rounds, err := s.st.Rounds(ctx, p.ID)
+		rounds, err := s.db().Rounds(ctx, p.ID)
 		if err != nil {
 			fail(w, err)
 			return
 		}
 		cr := cargoReport{Position: p}
 		for _, rd := range rounds {
-			res, err := s.st.Tally(ctx, rd.ID)
+			res, err := s.db().Tally(ctx, rd.ID)
 			if err != nil {
 				fail(w, err)
 				return

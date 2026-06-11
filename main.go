@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -25,23 +26,50 @@ import (
 func main() {
 	addr := flag.String("addr", ":8080", "endereço de escuta")
 	host := flag.String("host", "", "IP/host anunciado no QR, telão e logs (vazio = autodetecção; útil em hotspot)")
-	dbPath := flag.String("db", "votacao.db", "caminho do arquivo SQLite")
+	data := flag.String("data", "", "pasta de dados — um arquivo .db por eleição (vazio = pasta do -db)")
+	dbPath := flag.String("db", "votacao.db", "eleição inicial (atalho; o gerenciador em /board/eleicoes troca a quente)")
 	pin := flag.String("pin", "", "define/troca o PIN da mesa (opcional; senão, define-se na 1ª vez em /board)")
 	seed := flag.Bool("seed", false, "popula dados de exemplo e sai")
 	tokens := flag.Int("tokens", 200, "qtd de tokens a gerar no -seed")
 	flag.Parse()
 
-	st, err := store.Open(*dbPath)
+	// Pasta de dados (ADR-0012): -data manda; senão, a pasta do -db. A eleição
+	// ativa vem do -db explícito > meta da pasta > votacao.db.
+	dir, file := *data, ""
+	if dir == "" {
+		dir, file = filepath.Dir(*dbPath), filepath.Base(*dbPath)
+	}
+	mgr, err := store.OpenElections(dir)
+	if err != nil {
+		log.Fatalf("pasta de dados: %v", err)
+	}
+	dbExplicit := false
+	flag.Visit(func(f *flag.Flag) { dbExplicit = dbExplicit || f.Name == "db" })
+	active := mgr.Active()
+	if dbExplicit || active == "" {
+		if file == "" {
+			file = "votacao.db"
+		}
+		active = file
+	}
+	activePath, err := mgr.Path(active)
+	if err != nil {
+		log.Fatalf("eleição ativa: %v", err)
+	}
+	st, err := store.Open(activePath)
 	if err != nil {
 		log.Fatalf("abrir store: %v", err)
 	}
 	defer st.Close()
+	if err := mgr.SetActive(active); err != nil {
+		log.Fatalf("eleição ativa: %v", err)
+	}
 
 	if *seed {
 		if err := semear(st, *tokens); err != nil {
 			log.Fatalf("seed: %v", err)
 		}
-		log.Printf("seed pronto em %s (%d tokens). Suba com: go run .", *dbPath, *tokens)
+		log.Printf("seed pronto em %s (%d tokens). Suba com: go run .", activePath, *tokens)
 		return
 	}
 
@@ -53,7 +81,7 @@ func main() {
 	}
 	pinDefinido, _ := st.PINHash(context.Background())
 
-	srv, err := web.New(st, *addr, *host)
+	srv, err := web.New(mgr, st, *addr, *host)
 	if err != nil {
 		log.Fatalf("web: %v", err)
 	}

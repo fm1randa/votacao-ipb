@@ -20,7 +20,7 @@ import (
 // setupWizard decide o passo do wizard pelo estado atual.
 func (s *Server) setupWizard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	hash, err := s.st.PINHash(ctx)
+	hash, err := s.db().PINHash(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -33,13 +33,17 @@ func (s *Server) setupWizard(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/board/login", http.StatusSeeOther)
 		return
 	}
-	_, err = s.st.FirstCongress(ctx)
+	_, err = s.db().FirstCongress(ctx)
 	if errors.Is(err, sql.ErrNoRows) { // passo 2: a eleição (âmbito, sociedade, cargos)
+		// Banco com histórico mas sem congresso = Eleição resetada: oferece o
+		// caminho de volta (Desfazer pelo Histórico) antes de reconfigurar.
+		_, temOp, _ := s.db().LastOperation(ctx)
 		s.render(w, "setup_congresso.html", map[string]any{
-			"AnoDefault": time.Now().Year(),
-			"Sociedades": store.Sociedades,
-			"Presets":    store.PresetPositions(store.AmbitoFederacao, "UMP"),
-			"Ambito":     store.AmbitoFederacao,
+			"AnoDefault":   time.Now().Year(),
+			"Sociedades":   store.Sociedades,
+			"Presets":      store.PresetPositions(store.AmbitoFederacao, "UMP"),
+			"Ambito":       store.AmbitoFederacao,
+			"TemHistorico": temOp,
 		})
 		return
 	}
@@ -48,8 +52,8 @@ func (s *Server) setupWizard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// passo 3: delegados (rol vazio, ou ?step=delegados para continuar nele)
-	cong, _ := s.st.FirstCongress(ctx)
-	electors, err := s.st.Electors(ctx, cong.ID)
+	cong, _ := s.db().FirstCongress(ctx)
+	electors, err := s.db().Electors(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -58,8 +62,8 @@ func (s *Server) setupWizard(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/board", http.StatusSeeOther)
 		return
 	}
-	locals, _ := s.st.Locals(ctx, cong.ID)
-	subLocals, _ := s.st.SubLocals(ctx, cong.ID)
+	locals, _ := s.db().Locals(ctx, cong.ID)
+	subLocals, _ := s.db().SubLocals(ctx, cong.ID)
 	s.render(w, "setup_delegados.html", map[string]any{
 		"Congresso": cong, "Electors": electors, "Locals": locals, "SubLocals": subLocals,
 	})
@@ -100,11 +104,11 @@ func (s *Server) setupCongresso(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/board/setup", http.StatusSeeOther)
 		return
 	}
-	if _, err := s.st.FirstCongress(r.Context()); err == nil {
+	if _, err := s.db().FirstCongress(r.Context()); err == nil {
 		http.Redirect(w, r, "/board/setup", http.StatusSeeOther) // já existe
 		return
 	}
-	if _, err := s.st.SetupCongress(r.Context(), ambito, sociedade, nome, ano,
+	if _, err := s.db().SetupCongress(r.Context(), ambito, sociedade, nome, ano,
 		disabledRolesFrom(r, ambito, sociedade)); err != nil {
 		http.Error(w, err.Error(), 400) // ex.: UCP não tem Confederação Nacional
 		return
@@ -154,7 +158,7 @@ func validInput(in *store.ElectorInput) error {
 // delegadoAdd cadastra um votante (form individual).
 func (s *Server) delegadoAdd(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -164,7 +168,7 @@ func (s *Server) delegadoAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	err = s.st.ImportElectors(ctx, cong.ID, []store.ElectorInput{in}, "Adicionou "+in.Nome)
+	err = s.db().ImportElectors(ctx, cong.ID, []store.ElectorInput{in}, "Adicionou "+in.Nome)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
@@ -175,7 +179,7 @@ func (s *Server) delegadoAdd(w http.ResponseWriter, r *http.Request) {
 // delegadoImport cadastra em massa (colar lista; formato por âmbito — SPEC §10.3).
 func (s *Server) delegadoImport(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -185,7 +189,7 @@ func (s *Server) delegadoImport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if err := s.st.ImportElectors(ctx, cong.ID, items,
+	if err := s.db().ImportElectors(ctx, cong.ID, items,
 		"Importou "+strconv.Itoa(len(items))+" nomes"); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
@@ -252,7 +256,7 @@ func parseImport(text, ambito string) ([]store.ElectorInput, error) {
 // delegadoUpdate edita um votante (modal de edição).
 func (s *Server) delegadoUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -263,7 +267,7 @@ func (s *Server) delegadoUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	if err := s.st.UpdateElector(ctx, cong.ID, id, in); err != nil {
+	if err := s.db().UpdateElector(ctx, cong.ID, id, in); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -273,13 +277,13 @@ func (s *Server) delegadoUpdate(w http.ResponseWriter, r *http.Request) {
 // delegadoDelete remove um delegado nunca credenciado.
 func (s *Server) delegadoDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	id, _ := strconv.ParseInt(r.FormValue("elector_id"), 10, 64)
-	if err := s.st.DeleteElector(ctx, id); err != nil {
+	if err := s.db().DeleteElector(ctx, id); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
@@ -291,14 +295,14 @@ func (s *Server) delegadoDelete(w http.ResponseWriter, r *http.Request) {
 // (wizard usa ?next=/board/setup).
 func (s *Server) credListaResp(w http.ResponseWriter, r *http.Request, congressID int64, toast string) {
 	if r.Header.Get("HX-Request") == "true" {
-		electors, err := s.st.Electors(r.Context(), congressID)
+		electors, err := s.db().Electors(r.Context(), congressID)
 		if err != nil {
 			fail(w, err)
 			return
 		}
-		q, _ := s.st.Quorum(r.Context(), congressID)
-		locals, _ := s.st.Locals(r.Context(), congressID)
-		subLocals, _ := s.st.SubLocals(r.Context(), congressID)
+		q, _ := s.db().Quorum(r.Context(), congressID)
+		locals, _ := s.db().Locals(r.Context(), congressID)
+		subLocals, _ := s.db().SubLocals(r.Context(), congressID)
 		w.Header().Set("HX-Trigger", hxTrigger(map[string]any{
 			"toast": map[string]any{"msg": toast, "undo": false}, "closeModals": true}))
 		s.render(w, "credListaOOB", map[string]any{
@@ -317,12 +321,12 @@ func (s *Server) credListaResp(w http.ResponseWriter, r *http.Request, congressI
 // ---------------------------------------------------------------------------
 
 func (s *Server) ajustes(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	positions, err := s.st.AllPositions(r.Context(), cong.ID)
+	positions, err := s.db().AllPositions(r.Context(), cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -336,13 +340,13 @@ func (s *Server) ajustes(w http.ResponseWriter, r *http.Request) {
 // ajustesCargos aplica os checkboxes de cargos opcionais (Ajustes).
 func (s *Server) ajustesCargos(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	r.ParseForm()
-	positions, err := s.st.AllPositions(ctx, cong.ID)
+	positions, err := s.db().AllPositions(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -356,13 +360,13 @@ func (s *Server) ajustesCargos(w http.ResponseWriter, r *http.Request) {
 		if !want && p.Ativo && p.Status != "pendente" {
 			continue
 		}
-		if err := s.st.SetPositionAtivo(ctx, p.ID, want); err != nil {
+		if err := s.db().SetPositionAtivo(ctx, p.ID, want); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
 	}
 	if r.Header.Get("HX-Request") == "true" {
-		updated, err := s.st.AllPositions(ctx, cong.ID)
+		updated, err := s.db().AllPositions(ctx, cong.ID)
 		if err != nil {
 			fail(w, err)
 			return
@@ -376,7 +380,7 @@ func (s *Server) ajustesCargos(w http.ResponseWriter, r *http.Request) {
 
 // ajustesZona: região viva da Zona de perigo (o card muda Encerrar↔Reabrir sozinho).
 func (s *Server) ajustesZona(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
@@ -386,7 +390,7 @@ func (s *Server) ajustesZona(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ajustesSave(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -402,7 +406,7 @@ func (s *Server) ajustesSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "informe nome, ano, âmbito e sociedade válidos", 400)
 		return
 	}
-	if err := s.st.UpdateCongress(ctx, cong.ID, ambito, sociedade, nome, ano); err != nil {
+	if err := s.db().UpdateCongress(ctx, cong.ID, ambito, sociedade, nome, ano); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}

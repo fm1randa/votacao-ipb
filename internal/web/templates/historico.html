@@ -30,7 +30,10 @@
       var body = document.getElementById('restore-body');
       body.innerHTML = '<p class="mut">Carregando…</p>';
       document.getElementById('m-restore').classList.add('open');
-      fetch('/board/restore/preview?op_id=' + rest.dataset.op).then(function(r){ return r.text(); }).then(function(html){ body.innerHTML = html; });
+      fetch('/board/restore/preview?op_id=' + rest.dataset.op).then(function(r){ return r.text(); }).then(function(html){
+        body.innerHTML = html;
+        if (window.htmx) htmx.process(body); // ativa o hx-post do form injetado
+      });
       return;
     }
     if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');

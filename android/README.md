@@ -40,9 +40,11 @@ O app tem dois modos (seletor na tela inicial; a escolha é lembrada):
   (exigência do Bionic ARM64; equivale ao `termux-elf-cleaner`).
 - `ServerService` (foreground + wake lock): cria o hotspot, acha o IP da
   interface (`ap*`/`swlan*`), executa
-  `libvotacao.so -addr :8090 -host <ip> -db <filesDir>/votacao.db`,
-  faz health-check TCP e publica o estado pra Activity. Logs do Go saem no
-  logcat com a tag `votacao-go`.
+  `libvotacao.so -addr :8090 -host <ip> -data <filesDir>` — a pasta inteira é o
+  acervo de eleições (um `.db` por eleição, ADR-0012; o gerenciador da Mesa em
+  `/board/eleicoes` cria/troca/reseta/exclui a quente) —, faz health-check TCP
+  e publica o estado pra Activity. Logs do Go saem no logcat com a tag
+  `votacao-go`.
 - `MainActivity`: identidade visual do app web (verde IPB sobre branco-quente,
   logo oficial), header com **bolinha de status** (cinza Parado · âmbar
   Iniciando · verde No ar · vermelho Erro) e mensagem detalhada quando há algo

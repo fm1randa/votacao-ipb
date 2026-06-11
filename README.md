@@ -70,16 +70,18 @@ congress (ambito, sociedade)
 ## Estrutura
 
 ```
-main.go                       flags, bootstrap, IP da LAN, PIN, seed
+main.go                       flags (-data/-db), bootstrap, IP da LAN, PIN, seed
 internal/store/schema.sql     schema (embutido via //go:embed)
 internal/store/ambito.go      âmbitos, sociedades, presets de cargos, limites de idade
 internal/store/store.go       Open+WAL+migrações, tokens, CastVote (queima atômica)
+internal/store/elections.go   gerenciador: um .db por eleição na pasta de dados (ADR-0012)
 internal/store/electors.go    eleição, unidades, rol, credenciar, presença, quórum
 internal/store/positions.go   cargos, escrutínios, máquina de estados, runoff
 internal/store/tally.go       apuração: maioria, runoff, desempate por idade
 internal/store/tally_test.go  testes do motor
 internal/web/web.go           servidor, rotas, PIN, termos por âmbito, eleitor/telão
 internal/web/web_board.go     handlers da mesa + relatório
+internal/web/web_eleicoes.go  gerenciador de eleições (criar/abrir/resetar/excluir)
 internal/web/templates/       html/template embutidos
 android/                      app Android "casca fina" (SPIKE) — hospeda o servidor
                               no celular: LocalOnlyHotspot + 2 QR codes; ver android/README.md
@@ -89,10 +91,20 @@ android/build-go.sh           compila o servidor Go → jniLibs/arm64-v8a/libvot
 > O repositório é um **monorepo**: o app Android mora em `android/` (projeto
 > Gradle standalone, fora do go.mod).
 
+## Várias eleições e reset
+
+Cada eleição vive num **arquivo SQLite próprio** na pasta de dados (ADR-0012).
+A Mesa administra tudo em **`/board/eleicoes`**: criar, abrir (troca a quente),
+**Resetar** (volta ao wizard; desfazível pelo Histórico) e **Excluir** (apaga o
+arquivo; irreversível). As ações destrutivas exigem digitar o nome exato da
+eleição. Flags: `-data <pasta>` (a pasta lembra a última eleição ativa) ou
+`-db arquivo.db` (atalho; a pasta do arquivo vira a pasta de dados).
+
 ## Gotchas operacionais
 - **Nobreak/baterias** no notebook e roteador.
-- **Backup contínuo:** copie `votacao.db*` (os 3 arquivos) periodicamente. WAL já
-  persiste cada voto e recupera após queda (testado com SIGKILL).
+- **Backup contínuo:** copie os arquivos `*.db*` da pasta de dados (cada eleição
+  são 3 arquivos com WAL). O WAL persiste cada voto e recupera após queda
+  (testado com SIGKILL).
 - **Roteador reserva** na mochila (~R$150).
 
 ## Cross-compile pro notebook da federação

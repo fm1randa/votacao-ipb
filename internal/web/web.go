@@ -25,13 +25,42 @@ var templatesFS embed.FS
 var assetsFS embed.FS
 
 type Server struct {
-	st   *store.Store
+	mgr  *store.Elections            // pasta de dados: um .db por Eleição (ADR-0012)
+	cur  atomic.Pointer[store.Store] // a Eleição ativa — trocada a quente pelo gerenciador
 	tpl  *template.Template
 	hub  *Hub
 	addr string // porta de escuta (ex. ":8090") — usada no QR/baseURL
 	host string // override do -host: IP/host anunciado (QR, telão); "" = autodetectar
 
 	congCache atomic.Value // congEntry — alimenta os termos por âmbito (TTL curto)
+}
+
+// db devolve o Store da Eleição ativa. Handlers em voo seguram o ponteiro que
+// leram — por isso o switchTo fecha o banco antigo com atraso, não na hora.
+func (s *Server) db() *store.Store { return s.cur.Load() }
+
+// switchTo abre a Eleição `file` e a torna ativa, sem derrubar o servidor.
+// O Broadcast acorda as telas vivas (telão/board/delegado re-buscam fragmentos).
+func (s *Server) switchTo(file string) error {
+	p, err := s.mgr.Path(file)
+	if err != nil {
+		return err
+	}
+	st, err := store.Open(p)
+	if err != nil {
+		return err
+	}
+	if err := s.mgr.SetActive(file); err != nil {
+		st.Close()
+		return err
+	}
+	old := s.cur.Swap(st)
+	s.congCache.Store(congEntry{}) // expira o vocabulário por âmbito
+	if old != nil && old != st {
+		time.AfterFunc(10*time.Second, func() { old.Close() }) // espera handlers em voo
+	}
+	s.hub.Broadcast()
+	return nil
 }
 
 // congEntry guarda o congresso em cache para o vocabulário por âmbito (SPEC §10):
@@ -49,7 +78,7 @@ func (s *Server) cong() store.Congress {
 			return e.c
 		}
 	}
-	c, err := s.st.FirstCongress(context.Background())
+	c, err := s.db().FirstCongress(context.Background())
 	if err != nil {
 		c = store.Congress{Ambito: store.AmbitoFederacao, Sociedade: "UMP"}
 	}
@@ -121,8 +150,9 @@ func (s *Server) term(key string) string {
 	return key
 }
 
-func New(st *store.Store, addr, host string) (*Server, error) {
-	s := &Server{st: st, hub: newHub(), addr: addr, host: host}
+func New(mgr *store.Elections, st *store.Store, addr, host string) (*Server, error) {
+	s := &Server{mgr: mgr, hub: newHub(), addr: addr, host: host}
+	s.cur.Store(st)
 	funcs := template.FuncMap{
 		"term":      s.term,
 		"ambito":    func() string { return s.cong().Ambito },
@@ -197,11 +227,19 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /board", s.auth(s.board))
 	mux.HandleFunc("GET /board/fragment", s.auth(s.boardFragment))
 	mux.HandleFunc("GET /board/credenciamento", s.auth(s.credenciamento))
-	mux.HandleFunc("GET /board/historico", s.auth(s.historico))
-	mux.HandleFunc("GET /board/historico/fragment", s.auth(s.historicoFragment))
-	mux.HandleFunc("GET /board/restore/preview", s.auth(s.restorePreview))
-	mux.HandleFunc("POST /board/undo", s.auth(s.mut(s.undo)))
-	mux.HandleFunc("POST /board/restore", s.auth(s.mut(s.restore)))
+	// Histórico usa authPIN (não auth): depois de um Reset não há congresso,
+	// mas o Desfazer precisa continuar acessível para reverter o reset.
+	mux.HandleFunc("GET /board/historico", s.authPIN(s.historico))
+	mux.HandleFunc("GET /board/historico/fragment", s.authPIN(s.historicoFragment))
+	mux.HandleFunc("GET /board/restore/preview", s.authPIN(s.restorePreview))
+	mux.HandleFunc("POST /board/undo", s.authPIN(s.mut(s.undo)))
+	mux.HandleFunc("POST /board/restore", s.authPIN(s.mut(s.restore)))
+	// Gerenciador de Eleições (ADR-0012): listar, criar, abrir, resetar, excluir.
+	mux.HandleFunc("GET /board/eleicoes", s.authPIN(s.eleicoes))
+	mux.HandleFunc("POST /board/eleicoes/criar", s.authPIN(s.mut(s.eleicaoCriar)))
+	mux.HandleFunc("POST /board/eleicoes/abrir", s.authPIN(s.mut(s.eleicaoAbrir)))
+	mux.HandleFunc("POST /board/eleicoes/resetar", s.authPIN(s.mut(s.eleicaoResetar)))
+	mux.HandleFunc("POST /board/eleicoes/excluir", s.authPIN(s.mut(s.eleicaoExcluir)))
 	mux.HandleFunc("POST /board/eleicao/reiniciar", s.auth(s.mut(s.reiniciar)))
 	mux.HandleFunc("POST /board/eleicao/encerrar", s.auth(s.mut(s.encerrarEleicao)))
 	mux.HandleFunc("POST /board/eleicao/reabrir", s.auth(s.mut(s.reabrirEleicao)))
@@ -276,7 +314,7 @@ func (s *Server) actionDone(w http.ResponseWriter, r *http.Request, fallback, to
 // authPIN exige PIN definido + cookie da mesa (rotas do wizard pós-passo-1).
 func (s *Server) authPIN(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		hash, err := s.st.PINHash(r.Context())
+		hash, err := s.db().PINHash(r.Context())
 		if err != nil {
 			fail(w, err)
 			return
@@ -296,7 +334,7 @@ func (s *Server) authPIN(h http.HandlerFunc) http.HandlerFunc {
 // auth protege a área da mesa: PIN + congresso configurado (senão, wizard).
 func (s *Server) auth(h http.HandlerFunc) http.HandlerFunc {
 	return s.authPIN(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := s.st.FirstCongress(r.Context()); errors.Is(err, sql.ErrNoRows) {
+		if _, err := s.db().FirstCongress(r.Context()); errors.Is(err, sql.ErrNoRows) {
 			http.Redirect(w, r, "/board/setup", http.StatusSeeOther)
 			return
 		}
@@ -311,7 +349,7 @@ func (s *Server) grantCookie(w http.ResponseWriter, hash string) {
 
 func (s *Server) setupSubmit(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	hash, err := s.st.PINHash(ctx)
+	hash, err := s.db().PINHash(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -326,17 +364,17 @@ func (s *Server) setupSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/board/setup?e=1", http.StatusSeeOther)
 		return
 	}
-	if err := s.st.SetPIN(ctx, pin); err != nil {
+	if err := s.db().SetPIN(ctx, pin); err != nil {
 		fail(w, err)
 		return
 	}
-	newHash, _ := s.st.PINHash(ctx)
+	newHash, _ := s.db().PINHash(ctx)
 	s.grantCookie(w, newHash)
 	http.Redirect(w, r, "/board/setup", http.StatusSeeOther)
 }
 
 func (s *Server) loginForm(w http.ResponseWriter, r *http.Request) {
-	hash, err := s.st.PINHash(r.Context())
+	hash, err := s.db().PINHash(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
@@ -351,7 +389,7 @@ func (s *Server) loginForm(w http.ResponseWriter, r *http.Request) {
 func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	r.ParseForm()
-	ok, err := s.st.CheckPIN(ctx, r.FormValue("pin"))
+	ok, err := s.db().CheckPIN(ctx, r.FormValue("pin"))
 	if err != nil {
 		fail(w, err)
 		return
@@ -360,7 +398,7 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/board/login?e=1", http.StatusSeeOther)
 		return
 	}
-	hash, _ := s.st.PINHash(ctx)
+	hash, _ := s.db().PINHash(ctx)
 	s.grantCookie(w, hash)
 	http.Redirect(w, r, "/board", http.StatusSeeOther)
 }
@@ -370,7 +408,7 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if errors.Is(err, sql.ErrNoRows) { // ainda não configurado → convite ao wizard
 		s.render(w, "home.html", map[string]any{"Setup": true})
 		return
@@ -384,7 +422,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 
 // screenCurrent: telão de endereço fixo — acompanha sozinho o escrutínio da vez.
 func (s *Server) screenCurrent(w http.ResponseWriter, r *http.Request) {
-	cong, err := s.st.FirstCongress(r.Context())
+	cong, err := s.db().FirstCongress(r.Context())
 	if errors.Is(err, sql.ErrNoRows) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -400,12 +438,12 @@ func (s *Server) screenCurrent(w http.ResponseWriter, r *http.Request) {
 // É o que faz o telão fixo trocar de escrutínio sem intervenção manual.
 func (s *Server) screenCurrentFragment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	rd, ok, err := s.st.LatestRound(ctx, cong.ID)
+	rd, ok, err := s.db().LatestRound(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -414,7 +452,7 @@ func (s *Server) screenCurrentFragment(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "telaoAguarde", map[string]any{"Congresso": cong})
 		return
 	}
-	res, err := s.st.Tally(ctx, rd.ID)
+	res, err := s.db().Tally(ctx, rd.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -429,7 +467,7 @@ func (s *Server) screenFragment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "escrutínio inválido", 400)
 		return
 	}
-	res, err := s.st.Tally(r.Context(), id)
+	res, err := s.db().Tally(r.Context(), id)
 	if err != nil {
 		fail(w, err)
 		return
@@ -453,12 +491,12 @@ func (s *Server) voteForm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderVote(w http.ResponseWriter, r *http.Request, token, errMsg string) {
 	ctx := r.Context()
-	cong, err := s.st.FirstCongress(ctx)
+	cong, err := s.db().FirstCongress(ctx)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	round, pos, open, err := s.st.OpenRound(ctx, cong.ID)
+	round, pos, open, err := s.db().OpenRound(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -467,11 +505,11 @@ func (s *Server) renderVote(w http.ResponseWriter, r *http.Request, token, errMs
 		http.Redirect(w, r, "/delegado", http.StatusSeeOther) // sem escrutínio → hub
 		return
 	}
-	if voted, _ := s.st.HasVoted(ctx, round.ID, token); voted {
+	if voted, _ := s.db().HasVoted(ctx, round.ID, token); voted {
 		http.Redirect(w, r, "/delegado", http.StatusSeeOther) // já votou → hub
 		return
 	}
-	cands, err := s.st.VotableElectors(ctx, round.ID)
+	cands, err := s.db().VotableElectors(ctx, round.ID)
 	if err != nil {
 		fail(w, err)
 		return
@@ -508,7 +546,7 @@ func (s *Server) voteSubmit(w http.ResponseWriter, r *http.Request) {
 		votee, _ = strconv.ParseInt(choice, 10, 64)
 	}
 
-	err := s.st.CastVote(ctx, roundID, tok, kind, votee)
+	err := s.db().CastVote(ctx, roundID, tok, kind, votee)
 	switch {
 	case err == nil, errors.Is(err, store.ErrAlreadyVoted), errors.Is(err, store.ErrRoundClosed):
 		// Sucesso, voto duplicado ou rodada fechada: o hub mostra o estado certo.
@@ -532,7 +570,7 @@ func (s *Server) screen(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "escrutínio inválido", 400)
 		return
 	}
-	res, err := s.st.Tally(r.Context(), id)
+	res, err := s.db().Tally(r.Context(), id)
 	if err != nil {
 		fail(w, err)
 		return

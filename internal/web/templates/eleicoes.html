@@ -1,0 +1,117 @@
+{{define "eleicoes.html"}}<!doctype html><html lang="pt-br"><head><title>Eleições — Mesa</title>{{template "styles"}}{{template "htmxjs"}}</head>
+<body>
+<div class="shell">
+  {{template "mesanav" .}}
+  <main class="content"><div class="wrap has-bottomnav">
+    <p class="eyebrow">Mesa</p>
+    <h1>Eleições</h1>
+    <p class="mut">Cada eleição vive num arquivo próprio na pasta de dados. A eleição
+      <strong>ativa</strong> é a que os votantes, o telão e a Mesa veem; trocar não
+      derruba o servidor.</p>
+    {{if .Erro}}<p class="pill warn">{{.Erro}}</p>{{end}}
+
+    <form method="post" action="/board/eleicoes/criar">
+      <button type="submit">+ Nova eleição</button>
+    </form>
+
+    {{$ativa := .Ativa}}
+    {{range .Eleicoes}}
+    <div class="card" {{if eq .File $ativa}}style="border-color:var(--green)"{{end}}>
+      <div class="row" style="align-items:flex-start">
+        <div>
+          <strong>{{if .Configurada}}{{.Nome}} · {{.Ano}}{{else}}Eleição em branco{{end}}</strong>
+          {{if eq .File $ativa}}<span class="pill on">ativa</span>{{end}}
+          {{if .Configurada}}
+            {{if .Encerrada}}<span class="pill off">encerrada</span>
+            {{else if .Aberta}}<span class="pill on">abertura declarada</span>
+            {{else}}<span class="pill warn">em preparação</span>{{end}}
+          {{else}}<span class="pill off">não configurada</span>{{end}}
+          <br><span class="mut" style="font-size:.85rem">
+            {{.File}}{{if .Configurada}} · {{.Votantes}} no rol{{end}}{{if .Operacoes}} · {{.Operacoes}} operações no histórico{{end}}
+          </span>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+        {{if ne .File $ativa}}
+          <form method="post" action="/board/eleicoes/abrir" style="display:inline">
+            <input type="hidden" name="file" value="{{.File}}">
+            <button type="submit" class="sm">Abrir</button>
+          </form>
+        {{else}}
+          <a class="btn ghost sm" href="/board">Ir para a Mesa</a>
+        {{end}}
+        <button type="button" class="ghost sm" data-acao="resetar"
+          data-file="{{.File}}" data-nome="{{if .Configurada}}{{.Nome}}{{end}}">Resetar</button>
+        <button type="button" class="ghost sm" style="color:var(--bad); border-color:color-mix(in srgb, var(--bad) 40%, var(--line))"
+          data-acao="excluir" data-file="{{.File}}" data-nome="{{if .Configurada}}{{.Nome}}{{end}}">Excluir</button>
+      </div>
+    </div>
+    {{end}}
+  </div></main>
+</div>
+{{template "mesabottom" .}}
+{{template "mesatoast" .}}
+
+<!-- Modal de confirmação destrutiva: fricção de digitar o nome exato. -->
+<div class="modal-backdrop" id="m-destrutivo"><div class="modal">
+  <h2 id="md-titulo">Confirmar</h2>
+  <p class="mut" id="md-aviso"></p>
+  <form id="md-form" method="post" hx-boost="false">
+    <input type="hidden" name="file" id="md-file">
+    <div id="md-confirmacao">
+      <label class="mut" for="md-input">Digite o nome exato da eleição para confirmar:</label>
+      <p style="margin:6px 0"><code id="md-nome" style="user-select:none"></code></p>
+      <input type="text" id="md-input" name="confirm" autocomplete="off" autocapitalize="off">
+    </div>
+    <button type="submit" class="danger" id="md-botao" disabled>Confirmar</button>
+  </form>
+  <button type="button" class="ghost" data-close>Cancelar</button>
+</div></div>
+
+<script>
+  (function(){
+    var acoes = {
+      resetar: {
+        titulo: 'Resetar a eleição?',
+        aviso: 'Apaga rol, cargos, tokens e votos e volta ao assistente de configuração. ' +
+               'O Histórico e o PIN ficam — dá para DESFAZER pelo Histórico.',
+        url: '/board/eleicoes/resetar', botao: 'Resetar a eleição'
+      },
+      excluir: {
+        titulo: 'Excluir a eleição?',
+        aviso: 'Apaga o arquivo da eleição, inclusive o Histórico. ' +
+               'É IRREVERSÍVEL — não há Desfazer.',
+        url: '/board/eleicoes/excluir', botao: 'Excluir definitivamente'
+      }
+    };
+    var modal = document.getElementById('m-destrutivo');
+    var input = document.getElementById('md-input'), botao = document.getElementById('md-botao');
+    var nomeEl = document.getElementById('md-nome'), nomeEsperado = '';
+
+    function abrir(acao, file, nome){
+      var a = acoes[acao];
+      document.getElementById('md-titulo').textContent = a.titulo;
+      document.getElementById('md-aviso').textContent = a.aviso;
+      document.getElementById('md-form').setAttribute('action', a.url);
+      document.getElementById('md-file').value = file;
+      botao.textContent = a.botao;
+      nomeEsperado = nome || '';
+      // Eleição em branco: nada a perder, dispensa digitar o nome.
+      document.getElementById('md-confirmacao').style.display = nomeEsperado ? '' : 'none';
+      nomeEl.textContent = nomeEsperado;
+      input.value = ''; botao.disabled = !!nomeEsperado;
+      modal.classList.add('open');
+      if (nomeEsperado) input.focus();
+    }
+    input.addEventListener('input', function(){
+      botao.disabled = input.value.trim() !== nomeEsperado;
+    });
+    document.addEventListener('click', function(e){
+      var b = e.target.closest('[data-acao]');
+      if (b) { abrir(b.dataset.acao, b.dataset.file, b.dataset.nome); return; }
+      if (e.target.closest('[data-close]')) { modal.classList.remove('open'); return; }
+      if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');
+    });
+  })();
+</script>
+</body></html>{{end}}

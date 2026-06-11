@@ -134,6 +134,27 @@ qualquer ponto anterior. Inspirado no log de operações do jj.
 **Reiniciar a eleição**:
 Operação que apaga Escrutínios e Votos e zera Presença/credenciamento, mantendo o
 rol, os Cargos e os Tokens. Volta ao "pronto pra começar". Restaurável.
+_Avoid_: Resetar (Resetar apaga TUDO da Eleição; Reiniciar preserva rol e Cargos).
+
+**Eleição**:
+O evento eleitoral completo de um Congresso ou Plenária — do cadastro à
+proclamação. É a unidade que o Gerenciador lista, abre, reseta ou exclui.
+Uma Eleição por vez fica **ativa** (é a que a Mesa e os votantes veem).
+
+**Gerenciador de Eleições**:
+A tela da Mesa que lista todas as Eleições, permite criar uma nova, abrir
+(tornar ativa), Resetar ou Excluir. Trocar a Eleição ativa não derruba o
+servidor.
+
+**Resetar a Eleição**:
+Operação que esvazia a Eleição por completo — rol, Cargos, Tokens, Votos,
+configuração — e volta ao assistente de configuração. Mantém o Histórico e o
+PIN. Restaurável (grava o retrato anterior). Exige digitar o nome exato.
+_Avoid_: Reiniciar (que preserva rol e Cargos), limpar.
+
+**Excluir a Eleição**:
+Remove a Eleição definitivamente, inclusive seu Histórico. Irreversível —
+não há Desfazer. Exige digitar o nome exato.
 
 **Apuração**:
 A contagem dos Votos de um Escrutínio e a aplicação da regra de maioria.

@@ -359,6 +359,27 @@ func (s *Store) ReiniciarEleicao(ctx context.Context, congressID int64) error {
 	return tx.Commit()
 }
 
+// ResetEleicao esvazia a Eleição por completo — congresso, rol, cargos, tokens,
+// votos — e volta ao assistente de configuração. Diferente do Reiniciar (que
+// preserva rol e cargos), aqui só sobram o Histórico e o PIN: a operação grava
+// o retrato anterior, então o reset é desfazível pelo Histórico.
+func (s *Store) ResetEleicao(ctx context.Context) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := recordOp(ctx, tx, "Resetou a eleição (voltou ao estado inicial)"); err != nil {
+		return err
+	}
+	for _, t := range domainTables { // filhos→pais
+		if _, err := tx.ExecContext(ctx, "DELETE FROM "+t); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // EncerrarEleicao marca a eleição como encerrada (só leitura). Restaurável.
 func (s *Store) EncerrarEleicao(ctx context.Context, congressID int64) error {
 	return s.lifecycleFlag(ctx, congressID, "Encerrou a eleição", 1)

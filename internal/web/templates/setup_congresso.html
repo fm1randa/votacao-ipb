@@ -5,6 +5,13 @@
   <h1>Dados da eleição</h1>
   <p class="mut">Os cargos da Diretoria (conforme o GTSI) e a pilha de códigos de
     votação são criados automaticamente.</p>
+  {{if .TemHistorico}}
+  <div class="card" style="border-color:color-mix(in srgb, var(--gold) 45%, var(--line))">
+    <p class="mut" style="margin:0">Esta eleição foi <strong>resetada</strong>. Se foi sem querer,
+      dá para voltar atrás no <a href="/board/historico">Histórico</a> (Desfazer/Restaurar) —
+      ou seguir abaixo e configurar do zero. Outras eleições: <a href="/board/eleicoes">Eleições</a>.</p>
+  </div>
+  {{end}}
   <form method="post" action="/board/setup/congresso" id="f-cong">
     <div class="card">
       <label class="mut">Âmbito da eleição</label>

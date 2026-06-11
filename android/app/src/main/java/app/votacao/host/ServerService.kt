@@ -209,10 +209,11 @@ class ServerService : Service() {
             publish(HostState(KIND_ERROR, "Binário do servidor não está no APK — rode android/build-go.sh antes do build.", false, ssid, pass))
             return
         }
-        val db = File(filesDir, "votacao.db")
+        // -data: a pasta inteira é o acervo de eleições (um .db por eleição,
+        // ADR-0012) — o gerenciador em /board/eleicoes troca a ativa a quente.
         try {
             process = ProcessBuilder(
-                exe.absolutePath, "-addr", ":$PORT", "-host", ip, "-db", db.absolutePath,
+                exe.absolutePath, "-addr", ":$PORT", "-host", ip, "-data", filesDir.absolutePath,
             ).redirectErrorStream(true).start()
         } catch (e: Exception) {
             logErr("exec falhou: ${e.message}", e)
