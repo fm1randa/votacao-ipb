@@ -35,9 +35,9 @@ func main() {
 
 	// Pasta de dados (ADR-0012): -data manda; senão, a pasta do -db. A eleição
 	// ativa vem do -db explícito > meta da pasta > votacao.db.
-	dir, file := *data, ""
+	dir, file := *data, filepath.Base(*dbPath)
 	if dir == "" {
-		dir, file = filepath.Dir(*dbPath), filepath.Base(*dbPath)
+		dir = filepath.Dir(*dbPath)
 	}
 	mgr, err := store.OpenElections(dir)
 	if err != nil {

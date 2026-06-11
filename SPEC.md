@@ -312,6 +312,11 @@ que varia é configuração e vocabulário.
 ### 10.3 Decisões de mecânica
 - **Quórum computado como gate [decisão]:** ver §3.3 — "Declarar abertura" só
   habilita com quórum atingido; sem override; rol é a fonte da verdade.
+- **Elegíveis ≥ cargos como segundo gate [decisão 2026-06-11]:** a abertura
+  também exige presentes **elegíveis** (dentro do limite de idade do âmbito)
+  em número ≥ cargos ativos — eleito não acumula cargo, então sem N pessoas
+  votáveis não há eleição possível. O painel mostra a pílula
+  "X elegíveis para N cargos" e sugere desativar cargos opcionais em Ajustes.
 - **Nacional com hierarquia completa:** o rol nacional registra **Sinodal e
   Federação** de cada delegado. O critério de Federações **varia por sociedade**
   no GTSI vigente: **UMP** ≥ ⅓ das Federações (Art. 49c); **UPH** (Art. 134) e

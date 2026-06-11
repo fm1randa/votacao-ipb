@@ -111,8 +111,10 @@ somam ao denominador.
 
 **Declaração de Abertura**:
 O ato da Mesa que inicia a eleição (Art. 56c). Só habilita com Quórum computado
-atingido; depois dela, Escrutínios abrem sem nova exigência (a contagem segue
-visível). Não há override — rol incorreto corrige-se editando o rol.
+atingido E com presentes elegíveis em número ≥ Cargos a eleger (cada Cargo
+exige uma pessoa distinta). Depois dela, Escrutínios abrem sem nova exigência
+(a contagem segue visível). Não há override — rol incorreto corrige-se
+editando o rol.
 
 **Indicação**:
 Nome proposto pelo Plenário para um Cargo (opcional). Sem Indicação, qualquer

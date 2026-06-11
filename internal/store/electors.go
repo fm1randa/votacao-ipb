@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -58,6 +59,9 @@ type QuorumInfo struct {
 	SubRepr         int    // só nacional: federações com ≥1 delegado presente
 	SubRegra        string // só nacional: SubRegraTerco | SubRegraMetade | SubRegraNada
 	Ok              bool
+	Elegiveis       int  // presentes aptos a SER votados (dentro do limite de idade)
+	CargosAtivos    int  // cargos ativos a eleger
+	ElegiveisOk     bool // Elegiveis ≥ CargosAtivos (cada cargo exige uma pessoa distinta)
 	TokensEntregues int
 	Reemissoes      int // tokens entregues além dos credenciados (perdas)
 }
@@ -90,7 +94,8 @@ func (s *Store) FirstCongress(ctx context.Context) (Congress, error) {
 }
 
 // DeclararAbertura é o gate computado (ADR-0010): só declara com quórum
-// atingido. Sem override — rol incorreto corrige-se editando o rol.
+// atingido E presentes elegíveis suficientes para todos os cargos. Sem
+// override — rol incorreto corrige-se editando o rol.
 func (s *Store) DeclararAbertura(ctx context.Context, congressID int64) error {
 	q, err := s.Quorum(ctx, congressID)
 	if err != nil {
@@ -98,6 +103,10 @@ func (s *Store) DeclararAbertura(ctx context.Context, congressID int64) error {
 	}
 	if !q.Ok {
 		return errors.New("quórum não atingido — confira a presença e o rol")
+	}
+	if !q.ElegiveisOk {
+		return fmt.Errorf("presentes elegíveis insuficientes: %d para %d cargos a eleger",
+			q.Elegiveis, q.CargosAtivos)
 	}
 	if err := s.snapshotOp(ctx, "Declarou a abertura (quórum verificado)"); err != nil {
 		return err
@@ -554,6 +563,20 @@ func (s *Store) Quorum(ctx context.Context, congressID int64) (QuorumInfo, error
 	if q.Reemissoes < 0 {
 		q.Reemissoes = 0
 	}
+	// Elegíveis × cargos: como eleito não acumula cargo, a eleição só é possível
+	// com ao menos tantos presentes votáveis (limite de idade incluso) quantos
+	// cargos ativos. É o segundo gate da Declaração de Abertura.
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM elector e WHERE e.congress_id=? AND e.presente=1`+
+			ageEligibleSQL(cong.Ambito, cong.Sociedade), congressID).Scan(&q.Elegiveis); err != nil {
+		return q, err
+	}
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM position WHERE congress_id=? AND ativo=1`,
+		congressID).Scan(&q.CargosAtivos); err != nil {
+		return q, err
+	}
+	q.ElegiveisOk = q.Elegiveis >= q.CargosAtivos
 	return q, nil
 }
 

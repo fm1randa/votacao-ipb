@@ -110,15 +110,21 @@
     {{end}}
     <p style="margin-top:10px">
       {{if .Quorum.Ok}}<span class="pill on">há quórum</span>{{else}}<span class="pill off">sem quórum</span>{{end}}
+      {{if not .Quorum.ElegiveisOk}}<span class="pill warn">{{.Quorum.Elegiveis}} elegíveis para {{.Quorum.CargosAtivos}} cargos</span>{{end}}
       {{if .Congresso.AberturaDeclarada}}<span class="pill on">abertura declarada</span>{{end}}
     </p>
     {{if not .Congresso.AberturaDeclarada}}
-      {{if .Quorum.Ok}}
+      {{if and .Quorum.Ok .Quorum.ElegiveisOk}}
         <form hx-post="/board/abertura" hx-swap="none"><button class="ok">Declarar abertura</button></form>
       {{else}}
-        <button class="ok" disabled title="quórum não atingido">Declarar abertura</button>
-        <p class="mut" style="margin-top:8px">O botão habilita quando o quórum for atingido.
-          Rol incorreto? Corrija na aba {{term "Credenciar"}} — o cálculo acompanha.</p>
+        <button class="ok" disabled title="condições de abertura não atendidas">Declarar abertura</button>
+        <p class="mut" style="margin-top:8px">
+          {{if not .Quorum.Ok}}O botão habilita quando o quórum for atingido.
+            Rol incorreto? Corrija na aba {{term "Credenciar"}} — o cálculo acompanha.{{end}}
+          {{if not .Quorum.ElegiveisOk}}Cada cargo será ocupado por uma pessoa distinta —
+            são necessários ao menos {{.Quorum.CargosAtivos}} presentes elegíveis
+            (há {{.Quorum.Elegiveis}}). Cargos opcionais podem ser desativados em Ajustes.{{end}}
+        </p>
       {{end}}
     {{end}}
   </div>

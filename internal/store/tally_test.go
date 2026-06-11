@@ -11,6 +11,22 @@ import (
 // ns monta um nascimento ISO válido para os testes de desempate por idade.
 func ns(d string) sql.NullString { return sql.NullString{String: d, Valid: true} }
 
+// presentesExtra adiciona n votantes jovens já presentes — satisfaz o gate de
+// elegíveis ≥ cargos (abertura) sem mexer na lógica de quórum de cada teste.
+func presentesExtra(t *testing.T, st *Store, cong int64, local *int64, n int) {
+	t.Helper()
+	ctx := context.Background()
+	for i := 0; i < n; i++ {
+		id, err := st.AddElector(ctx, cong, fmt.Sprintf("Extra %d", i+1), local, nil, false, "1999-01-01")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Credenciar(ctx, cong, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 // --- Testes puros da regra de vitória (decidirEleito) ---------------------
 
 func TestDecidirEleito_MaioriaEscrutinio1(t *testing.T) {
@@ -300,6 +316,7 @@ func TestCargosConfiguraveis(t *testing.T) {
 	if _, err := st.Credenciar(ctx, cong, id); err != nil {
 		t.Fatal(err)
 	}
+	presentesExtra(t, st, cong, &loc, 4) // 5 cargos ativos (2º Sec reativado) exigem 5 elegíveis
 	must(t, st.DeclararAbertura(ctx, cong))
 	for _, p := range all {
 		if p.Role == RoleVice {
@@ -345,6 +362,7 @@ func TestDeclararAbertura_ExigeQuorumComputado(t *testing.T) {
 	if _, err := st.Credenciar(ctx, cong, e2); err != nil {
 		t.Fatal(err)
 	}
+	presentesExtra(t, st, cong, &locs[0], 4) // 6 cargos exigem 6 elegíveis
 	must(t, st.DeclararAbertura(ctx, cong))
 }
 
@@ -352,8 +370,10 @@ func TestQuorumLocal_MetadeDoRol(t *testing.T) {
 	ctx := context.Background()
 	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
 	t.Cleanup(func() { st.Close() })
-	// UMP local com 4 sócios no rol: 2 presentes não bastam; 3 sim.
-	cong, _ := st.SetupCongress(ctx, AmbitoLocal, "UMP", "UMP da IP Central", 2026, nil)
+	// UMP local com 4 sócios no rol: 2 presentes não bastam; 3 sim. Diretoria
+	// reduzida (Art. 13) p/ o gate de elegíveis não interferir no de quórum.
+	cong, _ := st.SetupCongress(ctx, AmbitoLocal, "UMP", "UMP da IP Central", 2026,
+		[]string{RoleVice, RoleSegundoSec})
 	var ids []int64
 	for _, nome := range []string{"A", "B", "C", "D"} {
 		id, _ := st.AddElector(ctx, cong, nome, nil, nil, false, "1999-01-01")
@@ -478,6 +498,7 @@ func TestIdadeMaxima_BloqueiaCandidaturaNaoOVoto(t *testing.T) {
 	must(t, err)
 	_, err = st.Credenciar(ctx, cong, jovem)
 	must(t, err)
+	presentesExtra(t, st, cong, &fed, 5) // 6 cargos exigem 6 elegíveis (o velho não conta)
 	must(t, st.DeclararAbertura(ctx, cong))
 
 	poss, _ := st.Positions(ctx, cong)
@@ -539,11 +560,12 @@ func TestMudarAmbito_SoAntesDaAbertura(t *testing.T) {
 	if len(all) != 5 {
 		t.Fatalf("após trocar pra local, esperava 5 cargos, veio %d", len(all))
 	}
-	// Declara abertura (1 sócio de rol 1 = mais da metade) e tenta trocar de novo.
+	// Declara abertura (rol completo presente) e tenta trocar de novo.
 	id, _ := st.AddElector(ctx, cong, "Zé", nil, nil, false, "1999-01-01")
 	if _, err := st.Credenciar(ctx, cong, id); err != nil {
 		t.Fatal(err)
 	}
+	presentesExtra(t, st, cong, nil, 4) // 5 cargos exigem 5 elegíveis
 	must(t, st.DeclararAbertura(ctx, cong))
 	if err := st.UpdateCongress(ctx, cong, AmbitoSinodal, "UMP", "X", 2026); err == nil {
 		t.Fatal("trocar âmbito após a abertura deveria falhar")
@@ -646,5 +668,64 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Abertura exige presentes elegíveis suficientes para todos os cargos: como o
+// eleito não acumula cargo, sem N pessoas votáveis não há eleição possível.
+func TestAbertura_ExigeElegiveisParaOsCargos(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	// UMP local (preset = 5 cargos), rol de 3: quórum ok (3/3), mas 3 < 5 cargos.
+	cong, _ := st.SetupCongress(ctx, AmbitoLocal, "UMP", "UMP da IP Pequena", 2026, nil)
+	var ids []int64
+	for _, nome := range []string{"A", "B", "C"} {
+		id, _ := st.AddElector(ctx, cong, nome, nil, nil, false, "1999-01-01")
+		ids = append(ids, id)
+	}
+	for _, id := range ids {
+		if _, err := st.Credenciar(ctx, cong, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q, _ := st.Quorum(ctx, cong)
+	if !q.Ok || q.ElegiveisOk || q.Elegiveis != 3 || q.CargosAtivos != 5 {
+		t.Fatalf("esperava quórum ok mas elegíveis insuficientes (3 p/ 5): %+v", q)
+	}
+	if err := st.DeclararAbertura(ctx, cong); err == nil {
+		t.Fatal("abertura deveria ser recusada com 3 elegíveis para 5 cargos")
+	}
+	// Mais 2 sócios presentes (5 ≥ 5) → abre.
+	for _, nome := range []string{"D", "E"} {
+		id, _ := st.AddElector(ctx, cong, nome, nil, nil, false, "1999-01-01")
+		if _, err := st.Credenciar(ctx, cong, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(t, st.DeclararAbertura(ctx, cong))
+}
+
+// No Sinodal de UMP, quem excede a idade máxima (33) vota mas não pode ser
+// votado — logo não conta como elegível para o gate da abertura.
+func TestAbertura_ElegiveisDescontamIdade(t *testing.T) {
+	ctx := context.Background()
+	st, _ := Open(filepath.Join(t.TempDir(), "t.db"))
+	t.Cleanup(func() { st.Close() })
+	cong, _ := st.SetupCongress(ctx, AmbitoSinodal, "UMP", "Confederação Sinodal UMP Teste", 2026, nil)
+	fed, _ := st.AddLocal(ctx, cong, "Federação A", 0)
+	// 6 delegados presentes, mas 2 acima do limite → 4 elegíveis p/ 6 cargos.
+	for i, nasc := range []string{"1999-01-01", "1999-01-01", "1999-01-01", "1999-01-01", "1980-01-01", "1980-01-01"} {
+		id, _ := st.AddElector(ctx, cong, fmt.Sprintf("D%d", i), &fed, nil, false, nasc)
+		if _, err := st.Credenciar(ctx, cong, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q, _ := st.Quorum(ctx, cong)
+	if !q.Ok || q.Elegiveis != 4 || q.CargosAtivos != 6 || q.ElegiveisOk {
+		t.Fatalf("esperava 4 elegíveis (idade) p/ 6 cargos: %+v", q)
+	}
+	if err := st.DeclararAbertura(ctx, cong); err == nil {
+		t.Fatal("abertura deveria ser recusada: 4 elegíveis para 6 cargos")
 	}
 }
