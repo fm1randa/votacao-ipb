@@ -4,7 +4,7 @@
 > Protótipo no branch `advisor/004-ballot-secrecy-spike`; ainda não fundido (a
 > fusão é ato do mantenedor). Decisões: **Direção 1**; **sem migração**
 > (greenfield — não há eleição real em arquivo); **Desfazer/Restaurar** sem
-> mudança; **Elo A** intocado. Registro detalhado em `plans/004-findings.md`.
+> mudança; **Elo A** intocado. Registro detalhado: issue #7 (spike do plano 004).
 
 ## Contexto — o segredo não era segredo
 
