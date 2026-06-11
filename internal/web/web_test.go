@@ -267,12 +267,8 @@ func TestVersaoNoRodapeDaMesa(t *testing.T) {
 	for _, c := range resp.Cookies() {
 		req.AddCookie(c)
 	}
-	// Sem congresso configurado → redirect para /board/setup; mas a versão
-	// aparece no rodapé do setup wizard também (mesmo template mesanav).
-	// Usamos o cliente com jar para seguir até uma página que renderize mesanav.
-	// Na verdade, /board/setup renderiza sem mesanav — buscamos /board diretamente.
-	// Sem congresso o /board redireciona para setup (auth → FirstCongress).
-	// Configuramos um congresso para acessar /board normalmente.
+	// Sem congresso, /board redireciona para o setup; configuramos um para
+	// que a página da Mesa (template mesanav) seja renderizada.
 	ctx := context.Background()
 	cong, err := st.SetupCongress(ctx, store.AmbitoLocal, "UMP", "Plenária Teste", 2026, nil)
 	if err != nil {
