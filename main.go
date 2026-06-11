@@ -96,7 +96,7 @@ func main() {
 		announce = web.LanIP()
 	}
 	go func() {
-		log.Printf("votação no ar em http://%s%s", announce, *addr)
+		log.Printf("votação %s no ar em http://%s%s", web.Version, announce, *addr)
 		log.Printf("  eleitores: abra esse endereço no celular (mesma rede WiFi)")
 		if announce == "localhost" {
 			log.Printf("  AVISO: IP da rede não detectado — rode com -host=<IP> (ex. hotspot)")

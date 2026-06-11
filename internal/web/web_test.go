@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -222,4 +223,86 @@ func TestVotoPeloHTTP(t *testing.T) {
 	if res.Depositados != 1 {
 		t.Fatalf("token não foi queimado: Depositados=%d, esperava 1", res.Depositados)
 	}
+}
+
+// --- Versão no rodapé da Mesa -----------------------------------------------
+
+func TestVersaoNoRodapeDaMesa(t *testing.T) {
+	// Garante que a variável global não vaze entre testes.
+	old := Version
+	defer func() { Version = old }()
+	Version = "v0.teste"
+
+	srv, st := newTestServer(t)
+	ts := httptest.NewServer(srv.Routes())
+	defer ts.Close()
+
+	if err := st.SetPIN(context.Background(), "4729"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Faz login na Mesa para obter o cookie "mesa".
+	jar := &cookieJar{}
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.PostForm(ts.URL+"/board/login", url.Values{"pin": {"4729"}})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("login: esperava 303, veio %d", resp.StatusCode)
+	}
+
+	// Seguir o redirect manualmente para /board.
+	req, err := http.NewRequest("GET", ts.URL+"/board", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Copia o cookie "mesa" para a requisição seguinte.
+	for _, c := range resp.Cookies() {
+		req.AddCookie(c)
+	}
+	// Sem congresso configurado → redirect para /board/setup; mas a versão
+	// aparece no rodapé do setup wizard também (mesmo template mesanav).
+	// Usamos o cliente com jar para seguir até uma página que renderize mesanav.
+	// Na verdade, /board/setup renderiza sem mesanav — buscamos /board diretamente.
+	// Sem congresso o /board redireciona para setup (auth → FirstCongress).
+	// Configuramos um congresso para acessar /board normalmente.
+	ctx := context.Background()
+	cong, err := st.SetupCongress(ctx, store.AmbitoLocal, "UMP", "Plenária Teste", 2026, nil)
+	if err != nil {
+		t.Fatalf("setup congresso: %v", err)
+	}
+	_ = cong
+
+	resp2, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("GET /board: %v", err)
+	}
+	defer resp2.Body.Close()
+	body, err := io.ReadAll(resp2.Body)
+	if err != nil {
+		t.Fatalf("ler body: %v", err)
+	}
+	if !strings.Contains(string(body), "v0.teste") {
+		t.Fatalf("versão %q não encontrada no rodapé da Mesa;\nbody:\n%s", "v0.teste", body)
+	}
+}
+
+// cookieJar é um jar mínimo para guardar cookies entre requisições nos testes.
+type cookieJar struct {
+	cookies []*http.Cookie
+}
+
+func (j *cookieJar) SetCookies(_ *url.URL, cookies []*http.Cookie) {
+	j.cookies = append(j.cookies, cookies...)
+}
+
+func (j *cookieJar) Cookies(_ *url.URL) []*http.Cookie {
+	return j.cookies
 }
