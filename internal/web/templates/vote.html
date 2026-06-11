@@ -6,6 +6,8 @@
   </div>
   <p class="eyebrow">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}}</p>
   <h1>{{.Cargo}}</h1>
+  <p style="margin:-2px 0 12px"><a href="#" id="ver-atrib" class="mut"
+    style="font-size:.9rem; font-weight:700">O que faz este cargo? Ler atribuições</a></p>
   {{if .Erro}}<div class="erro">{{.Erro}}</div>{{end}}
 
   <form method="post" action="/vote" id="f">
@@ -61,5 +63,20 @@
     document.getElementById('voltar').addEventListener('click', function(){
       step2.style.display='none'; step1.style.display='block';
     });
+    // Modal "Ler atribuições" (texto do GTSI para o cargo em votação).
+    document.getElementById('ver-atrib').addEventListener('click', function(e){
+      e.preventDefault();
+      var body = document.getElementById('atrib-body');
+      body.innerHTML = '<p class="mut">Carregando…</p>';
+      document.getElementById('m-atrib').classList.add('open');
+      fetch('/atribuicoes?pos={{.Round.PositionID}}')
+        .then(function(r){ return r.text(); })
+        .then(function(html){ body.innerHTML = html; });
+    });
+    document.addEventListener('click', function(e){
+      if (e.target.closest('[data-close]') || e.target.classList.contains('modal-backdrop'))
+        document.getElementById('m-atrib').classList.remove('open');
+    });
   </script>
+  <div class="modal-backdrop" id="m-atrib"><div class="modal wide" id="atrib-body"></div></div>
 </div></body></html>{{end}}

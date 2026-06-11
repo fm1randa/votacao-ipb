@@ -288,6 +288,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /screen/fragment", s.screenCurrentFragment)
 	mux.HandleFunc("GET /screen/{roundID}", s.screen)
 	mux.HandleFunc("GET /screen/{roundID}/fragment", s.screenFragment)
+	// Atribuições do cargo (GTSI) — pública: texto normativo, usada na cédula.
+	mux.HandleFunc("GET /atribuicoes", s.atribuicoes)
 	// QR de acesso (telão), tempo real (SSE) + assets embutidos (offline)
 	mux.HandleFunc("GET /qr.png", s.qrPNG)
 	mux.HandleFunc("GET /events", s.events)

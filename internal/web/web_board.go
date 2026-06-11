@@ -116,6 +116,24 @@ func (s *Server) credenciamento(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// atribuicoes devolve o corpo do modal "Ler atribuições": o texto integral do
+// GTSI para o cargo. Pública — é texto normativo, e a cédula do votante a usa.
+func (s *Server) atribuicoes(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.URL.Query().Get("pos"), 10, 64)
+	p, err := s.db().GetPosition(r.Context(), id)
+	if err != nil {
+		http.Error(w, "cargo não encontrado", 404)
+		return
+	}
+	cong := s.cong()
+	a, ok := store.AtribuicoesCargo(cong.Ambito, cong.Sociedade, p.Role)
+	if !ok {
+		http.Error(w, "sem texto de atribuições para este cargo", 404)
+		return
+	}
+	s.render(w, "atribuicoesCorpo", map[string]any{"Cargo": p.Nome, "A": a})
+}
+
 // historico é a aba do log de operações (Desfazer/Restaurar + zona de perigo).
 // Tolera banco sem congresso (pós-Reset): o Desfazer é o caminho de volta.
 func (s *Server) historico(w http.ResponseWriter, r *http.Request) {

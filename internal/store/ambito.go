@@ -150,6 +150,26 @@ func regioesNacional(sociedade string) [][2]string {
 //     cargos separados.
 func PresetPositions(ambito, sociedade string) []PositionPreset {
 	n := presetNames(sociedade)
+	// UCP tem Secretário ÚNICO (Específica UCP: Art. 9º local; Art. 28
+	// federados) — não há 1º/2º. O role continua primeiro_sec.
+	if sociedade == "UCP" {
+		sec := secretarioSolo(n[RolePrimeiroSec])
+		if ambito == AmbitoLocal {
+			return []PositionPreset{
+				{RolePresidente, n[RolePresidente], false},
+				{RoleVice, n[RoleVice], true},
+				{RolePrimeiroSec, sec, false},
+				{RoleTesoureiro, n[RoleTesoureiro], false},
+			}
+		}
+		return []PositionPreset{ // federação/sinodal (nacional não existe)
+			{RolePresidente, n[RolePresidente], false},
+			{RoleVice, n[RoleVice], true},
+			{RoleSecExec, n[RoleSecExec], true},
+			{RolePrimeiroSec, sec, false},
+			{RoleTesoureiro, n[RoleTesoureiro], false},
+		}
+	}
 	switch ambito {
 	case AmbitoLocal:
 		return []PositionPreset{

@@ -146,3 +146,55 @@ func TestEleicoes_NomeDeArquivoInvalido(t *testing.T) {
 		}
 	}
 }
+
+// --- Preset UCP: Secretário único (Específica UCP, Arts. 9º e 28) -----------
+
+func TestPresetUCP_SecretarioUnico(t *testing.T) {
+	local := PresetPositions(AmbitoLocal, "UCP")
+	if len(local) != 4 {
+		t.Fatalf("UCP local deveria ter 4 cargos (Art. 9º), veio %d", len(local))
+	}
+	fed := PresetPositions(AmbitoFederacao, "UCP")
+	if len(fed) != 5 {
+		t.Fatalf("UCP federada deveria ter 5 cargos (Art. 28), veio %d", len(fed))
+	}
+	for _, set := range [][]PositionPreset{local, fed} {
+		for _, p := range set {
+			if p.Role == RoleSegundoSec {
+				t.Fatal("UCP não tem 2º Secretário")
+			}
+			if p.Role == RolePrimeiroSec && p.Nome != "Secretário" {
+				t.Fatalf("o secretário da UCP exibe-se como 'Secretário', veio %q", p.Nome)
+			}
+		}
+	}
+}
+
+// --- Atribuições (GTSI): todo cargo de todo preset tem texto ----------------
+
+func TestAtribuicoes_CobremTodosOsPresets(t *testing.T) {
+	for _, soc := range Sociedades {
+		for _, amb := range []string{AmbitoLocal, AmbitoFederacao, AmbitoSinodal, AmbitoNacional} {
+			if ValidateAmbitoSociedade(amb, soc) != nil {
+				continue // UCP nacional não existe
+			}
+			for _, p := range PresetPositions(amb, soc) {
+				a, ok := AtribuicoesCargo(amb, soc, p.Role)
+				if !ok {
+					t.Errorf("%s/%s: cargo %q (%s) sem atribuições", soc, amb, p.Nome, p.Role)
+					continue
+				}
+				if a.Ref == "" || len(a.Itens) == 0 {
+					t.Errorf("%s/%s/%s: atribuição vazia: %+v", soc, amb, p.Role, a)
+				}
+			}
+		}
+	}
+	// Notas específicas: vices regionais da UMP Nacional e Sinodal da UCP.
+	if a, _ := AtribuicoesCargo(AmbitoNacional, "UMP", "vice_norte"); a.Nota == "" {
+		t.Error("vice regional da UMP Nacional deveria trazer o § único do Art. 29")
+	}
+	if a, _ := AtribuicoesCargo(AmbitoSinodal, "UCP", RolePresidente); a.Nota == "" {
+		t.Error("UCP Sinodal deveria trazer a nota do Art. 51 (termos substituídos)")
+	}
+}

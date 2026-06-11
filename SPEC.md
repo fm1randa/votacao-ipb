@@ -369,3 +369,20 @@ Gestão de múltiplas Eleições e do ciclo de vida de cada uma (ADR-0012).
   entidade (estilo GitHub). Eleições em branco dispensam (nada a perder).
 - **Boot lembra a última ativa** (meta `eleicao-ativa` na pasta); `-db`
   explícito na linha de comando tem precedência.
+
+## 12. Ler atribuições (2026-06-11)
+
+Botão "Ler atribuições" no card do cargo da vez (Mesa, visível antes e durante
+o escrutínio — é o texto que o presidente lê ao plenário) e link "O que faz
+este cargo?" na cédula do votante. Modal com o **texto integral** do artigo do
+cargo na Específica da sociedade, com referência (ex.: "Específica UMP,
+Art. 28") — GTSI vigente, transcrito e embutido no binário (offline) para as
+5 sociedades. Mapeamento por Específica: UMP um conjunto local + um federado;
+UPH/UPA um por âmbito; SAF local + Federação/Sinodal (Arts. 46–54) + Nacional;
+UCP local + Federação (Sinodal reusa com termos substituídos — Art. 51).
+Vices regionais da Nacional usam o artigo dos Vice-Presidentes (na UMP, com o
+§ único do Art. 29).
+
+**Correção de preset no caminho:** a UCP tem **Secretário único** (Específica
+UCP, Arts. 9º e 28) — o preset deixou de criar 1º/2º Secretários para UCP
+(local: 4 cargos; federados: 5).

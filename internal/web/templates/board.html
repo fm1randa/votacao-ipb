@@ -15,9 +15,10 @@
 {{template "mesabottom" .}}
 {{template "mesatoast" .}}
 
-<!-- Modal de indicação (Art. 91d) — fora da região viva pra sobreviver aos ticks
-     do SSE; o corpo é buscado fresco a cada abertura (lista de indicáveis). -->
+<!-- Modais de indicação (Art. 91d) e de atribuições — fora da região viva pra
+     sobreviver aos ticks do SSE; o corpo é buscado fresco a cada abertura. -->
 <div class="modal-backdrop" id="m-indicar"><div class="modal wide" id="indicar-body"></div></div>
+<div class="modal-backdrop" id="m-atrib"><div class="modal wide" id="atrib-body"></div></div>
 
 <script>
   function closeIndicar(){ document.getElementById('m-indicar').classList.remove('open'); }
@@ -32,8 +33,19 @@
         .then(function(html){ body.innerHTML = html; if (window.htmx) htmx.process(body); });
       return;
     }
-    if (e.target.closest('[data-close]')) { closeIndicar(); return; }
-    if (e.target.classList.contains('modal-backdrop')) closeIndicar();
+    var ab = e.target.closest('[data-atrib]');
+    if (ab) {
+      var abody = document.getElementById('atrib-body');
+      abody.innerHTML = '<p class="mut">Carregando…</p>';
+      document.getElementById('m-atrib').classList.add('open');
+      fetch('/atribuicoes?pos=' + ab.dataset.atrib)
+        .then(function(r){ return r.text(); })
+        .then(function(html){ abody.innerHTML = html; });
+      return;
+    }
+    var close = e.target.closest('[data-close]');
+    if (close) { close.closest('.modal-backdrop').classList.remove('open'); return; }
+    if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');
   });
   // Busca dentro do modal (o fragmento chega por fetch, então o filtro é delegado).
   document.addEventListener('input', function(e){
@@ -134,7 +146,10 @@
   {{else}}
     <div class="card">
       <p class="eyebrow">Cargo {{.AtualIdx}} de {{.Total}}</p>
-      <h2 style="margin-top:0">{{.Atual.Nome}}</h2>
+      <div class="row" style="align-items:baseline">
+        <h2 style="margin:0">{{.Atual.Nome}}</h2>
+        <button type="button" class="ghost sm" data-atrib="{{.Atual.ID}}">Ler atribuições</button>
+      </div>
       {{if .Round}}
         <p class="mut">Escrutínio {{.Round.Numero}}{{if .Round.Runoff}} · 2º turno{{end}} —
           {{if eq .Round.Status "aberto"}}<span class="pill on">aberto</span>{{else}}<span class="pill off">encerrado</span>{{end}}
@@ -179,4 +194,16 @@
       </div>
     {{end}}
   </div>
+{{end}}
+
+{{/* Corpo do modal "Ler atribuições" — texto integral do GTSI para o cargo. */}}
+{{define "atribuicoesCorpo"}}
+  <p class="eyebrow">Atribuições do cargo</p>
+  <h2 style="margin-top:0">{{.Cargo}}</h2>
+  <p class="mut" style="margin-top:-4px">{{.A.Ref}} (GTSI vigente)</p>
+  <ul style="list-style:none; padding:0; display:grid; gap:8px; margin:14px 0">
+    {{range .A.Itens}}<li>{{.}}</li>{{end}}
+  </ul>
+  {{if .A.Nota}}<p class="mut" style="font-style:italic">{{.A.Nota}}</p>{{end}}
+  <button type="button" class="ghost" data-close>Fechar</button>
 {{end}}
