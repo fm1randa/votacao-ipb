@@ -2,8 +2,8 @@
 <body><div class="wrap stagger">
   <div class="brand"><img src="/assets/img/logo_ipb.png" alt="Igreja Presbiteriana do Brasil"></div>
   <header style="text-align:center">
-    <p class="eyebrow">{{.Congresso.Nome}}</p>
-    <h1>{{term "Evento"}} {{.Congresso.Ano}}</h1>
+    <p class="eyebrow">{{entidade}}</p>
+    <h1>{{term "EventoEleicao"}} • {{.Congresso.Ano}}</h1>
   </header>
   <div hx-ext="sse" sse-connect="/events">
     <div hx-get="/delegado/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">

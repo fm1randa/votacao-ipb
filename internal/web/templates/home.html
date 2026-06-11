@@ -13,8 +13,8 @@
     </div>
   {{else}}
     <header style="text-align:center">
-      <p class="eyebrow">{{.Congresso.Nome}}</p>
-      <h1>{{term "Evento"}} {{.Congresso.Ano}}</h1>
+      <p class="eyebrow">{{entidade}}</p>
+      <h1>{{term "EventoEleicao"}} • {{.Congresso.Ano}}</h1>
     </header>
     <a class="btn" href="/delegado">Sou {{term "votante"}}</a>
     <a class="ghost btn" href="/board">Sou da mesa</a>

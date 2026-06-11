@@ -1,4 +1,4 @@
-{{define "screen_live.html"}}<!doctype html><html lang="pt-br"><head><title>Telão — {{.Congresso.Nome}}</title>
+{{define "screen_live.html"}}<!doctype html><html lang="pt-br"><head><title>Telão — {{entidade}}</title>
 {{template "styles"}}{{template "htmxjs"}}{{template "telaostyles"}}</head>
 <body class="dark">
   <div hx-ext="sse" sse-connect="/events">
@@ -19,8 +19,8 @@
 {{define "telaoAguarde"}}
   <div class="brand brand--screen"><img src="/assets/img/logo_ipb3.png" alt="Igreja Presbiteriana do Brasil"></div>
   <div class="card" style="text-align:center">
-    <p class="eyebrow" style="color:var(--gold)">{{.Congresso.Nome}}</p>
-    <h1>{{term "Evento"}} {{.Congresso.Ano}}</h1>
+    <p class="eyebrow" style="color:var(--gold)">{{entidade}}</p>
+    <h1>{{term "EventoEleicao"}} • {{.Congresso.Ano}}</h1>
     <p class="mut">O telão será exibido quando a mesa abrir o primeiro escrutínio.</p>
   </div>
 {{end}}

@@ -123,6 +123,11 @@ func (s *Server) term(key string) string {
 			return "Plenária"
 		}
 		return "Congresso"
+	case "EventoEleicao": // subtítulo sob o nome da entidade ("• ano" vem depois)
+		if local {
+			return "Plenária de eleição" // a Plenária comum não é de eleição
+		}
+		return "Congresso"
 	case "Credenciar": // rótulo da aba/página
 		if local {
 			return "Chamada"
@@ -150,6 +155,15 @@ func (s *Server) term(key string) string {
 	return key
 }
 
+// entidadeNome prefixa a sociedade ao nome da entidade ("UMP IPB Cordovil") —
+// a menos que o nome já a mencione ("Federação UMP do PRNT"), evitando eco.
+func entidadeNome(sociedade, nome string) string {
+	if sociedade == "" || strings.Contains(strings.ToUpper(nome), strings.ToUpper(sociedade)) {
+		return nome
+	}
+	return sociedade + " " + nome
+}
+
 func New(mgr *store.Elections, st *store.Store, addr, host string) (*Server, error) {
 	s := &Server{mgr: mgr, hub: newHub(), addr: addr, host: host}
 	s.cur.Store(st)
@@ -157,6 +171,11 @@ func New(mgr *store.Elections, st *store.Store, addr, host string) (*Server, err
 		"term":      s.term,
 		"ambito":    func() string { return s.cong().Ambito },
 		"sociedade": func() string { return s.cong().Sociedade },
+		// entidade: nome de exibição da entidade, com a sociedade à esquerda
+		// ("UMP IPB Cordovil"). entidadeDe é a variante para listas (gerenciador),
+		// onde cada item tem a própria sociedade.
+		"entidade":   func() string { c := s.cong(); return entidadeNome(c.Sociedade, c.Nome) },
+		"entidadeDe": entidadeNome,
 		// dataBR: exibe data ISO (banco) como DD/MM/AAAA.
 		"dataBR": func(iso string) string {
 			if t, err := time.Parse("2006-01-02", iso); err == nil {
