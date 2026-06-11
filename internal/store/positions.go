@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -322,9 +323,15 @@ func (s *Store) AbrirProximoEscrutinio(ctx context.Context, positionID int64) (R
 }
 
 func criarRound(ctx context.Context, tx *sql.Tx, positionID int64, numero int, runoff bool, candidatos []int64) (int64, error) {
+	// Salt do escrutínio (spike 004 / ADR-0013): 32 bytes aleatórios que derivam
+	// os vote_key. Vive só enquanto o escrutínio está aberto; é anulada ao encerrar.
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return 0, err
+	}
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO round(position_id, numero, runoff) VALUES (?, ?, ?)`,
-		positionID, numero, boolToInt(runoff))
+		`INSERT INTO round(position_id, numero, runoff, vote_key_salt) VALUES (?, ?, ?, ?)`,
+		positionID, numero, boolToInt(runoff), salt)
 	if err != nil {
 		return 0, err
 	}
@@ -517,8 +524,11 @@ func (s *Store) EncerrarEscrutinio(ctx context.Context, roundID int64) (Result, 
 	if err := s.snapshotOp(ctx, "Encerrou escrutínio: "+nome); err != nil {
 		return Result{}, err
 	}
+	// Anula a salt no encerramento (spike 004 / ADR-0013): a partir daqui os
+	// vote_key são HMACs sob uma chave perdida — o elo voto↔token fica severado
+	// de forma irreversível, mesmo para quem detém o .db inteiro.
 	if _, err := s.db.ExecContext(ctx,
-		`UPDATE round SET status = 'encerrado', encerrado_em = datetime('now')
+		`UPDATE round SET status = 'encerrado', encerrado_em = datetime('now'), vote_key_salt = NULL
 		 WHERE id = ? AND status = 'aberto'`, roundID); err != nil {
 		return Result{}, err
 	}

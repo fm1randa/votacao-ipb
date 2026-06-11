@@ -194,3 +194,49 @@ func TestSegredoDoVoto_VazamentoEnquantoAberto(t *testing.T) {
 	}
 	t.Logf("VAZAMENTO (aberto): %d cédulas ligadas a uma pessoa pelo log de operações", linked)
 }
+
+func TestSegredoDoVoto_NaoVazaAposEncerrar(t *testing.T) {
+	ctx := context.Background()
+	st, dbPath, cong, toks, ids := setupSecrecy(t)
+
+	pos, _ := st.Positions(ctx, cong)
+	r, err := st.AbrirCargo(ctx, cong, pos[0].ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	must(t, st.CastVote(ctx, r.ID, toks["Ana"], "candidato", ids["Bruno"]))
+	must(t, st.CastVote(ctx, r.ID, toks["Caio"], "candidato", ids["Bruno"]))
+	must(t, st.CastVote(ctx, r.ID, toks["Dora"], "branco", 0))
+
+	// A queima do token sobrevive ao redesenho: re-votar com o mesmo token (com o
+	// escrutínio ainda aberto) colide no vote_key e devolve ErrAlreadyVoted.
+	if err := st.CastVote(ctx, r.ID, toks["Ana"], "branco", 0); err != ErrAlreadyVoted {
+		t.Fatalf("esperava ErrAlreadyVoted (queima do token), veio %v", err)
+	}
+
+	// Encerra o escrutínio → a salt é anulada.
+	res, err := st.EncerrarEscrutinio(ctx, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A apuração sobrevive: Bruno=2, 1 branco, 3 depositados.
+	if res.Depositados != 3 || res.Brancos != 1 {
+		t.Fatalf("apuração errada após o redesenho: %+v", res)
+	}
+	var brunoVotos int
+	for _, l := range res.Lines {
+		if l.ElectorID == ids["Bruno"] {
+			brunoVotos = l.Votos
+		}
+	}
+	if brunoVotos != 2 {
+		t.Fatalf("esperava Bruno com 2 votos, veio %d (%+v)", brunoVotos, res.Lines)
+	}
+
+	// O fecho do sigilo: NENHUM caminho religa pessoa→cédula no .db inteiro.
+	if linked := deanonLinkCount(t, dbPath); linked != 0 {
+		t.Fatalf("VAZAMENTO RESIDUAL: %d cédulas ainda ligadas a uma pessoa após encerrar", linked)
+	}
+	t.Log("FECHADO: 0 cédulas religáveis a uma pessoa após o encerramento")
+}
