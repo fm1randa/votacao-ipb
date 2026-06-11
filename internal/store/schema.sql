@@ -2,11 +2,12 @@
 -- Base normativa: GTSI 2015 (Art. 90 local; Art. 26, 49–52, 91 federados). Ver SPEC.md §10.
 --
 -- Princípios centrais:
---  * Sigilo: `vote` referencia o delegado VOTADO (público), nunca o votante.
---    O elo do votante é só o `token` cego, sorteado às cegas no credenciamento.
+--  * Sigilo: `vote` referencia o delegado VOTADO (público), nunca o votante. O
+--    voto guarda vote_key = HMAC(salt do round, token), não o token; a salt é
+--    anulada no encerramento, severando o elo voto↔token de vez (ADR-0013).
 --  * Presença é da PESSOA, não do token (ADR-0002): quórum/reconciliação contam
 --    `elector.presente` (reversível), nunca tokens entregues.
---  * Queima atômica do token: UNIQUE(round_id, token) em `vote`.
+--  * Queima atômica do token: UNIQUE(round_id, vote_key) em `vote`.
 --  * Multi-âmbito (ADR-0009): um motor só; âmbito+sociedade são configuração.
 
 PRAGMA foreign_keys = ON;
@@ -100,6 +101,9 @@ CREATE TABLE IF NOT EXISTS position (
 );
 
 -- Escrutínio: rodada 1..3 de um cargo. `runoff`=1 no 3º (entre os 2 mais votados).
+-- `vote_key_salt` (spike 004 / ADR-0013): segredo aleatório do escrutínio (32 bytes)
+-- usado para derivar vote.vote_key = HMAC(salt, token). É ANULADO no encerramento,
+-- severando para sempre o elo voto↔token (sigilo do voto). NULL = escrutínio fechado.
 CREATE TABLE IF NOT EXISTS round (
     id            INTEGER PRIMARY KEY,
     position_id   INTEGER NOT NULL REFERENCES position(id) ON DELETE CASCADE,
@@ -109,6 +113,7 @@ CREATE TABLE IF NOT EXISTS round (
     runoff        INTEGER NOT NULL DEFAULT 0,
     aberto_em     TEXT    NOT NULL DEFAULT (datetime('now')),
     encerrado_em  TEXT,
+    vote_key_salt BLOB,
     UNIQUE (position_id, numero)
 );
 
@@ -122,15 +127,20 @@ CREATE TABLE IF NOT EXISTS round_candidate (
 );
 
 -- Voto. SEM votante. `votee_elector_id` = delegado votado (identidade pública).
--- A UNIQUE(round_id, token) é a queima do token (impede voto duplo no escrutínio).
+-- `vote_key` (spike 004 / ADR-0013) NÃO guarda o token: guarda HMAC(round.salt, token),
+-- valor opaco enquanto a salt vive e IRRECUPERÁVEL depois que ela é anulada no
+-- encerramento — é o que torna o voto secreto mesmo com o .db inteiro em mãos.
+-- A UNIQUE(round_id, vote_key) é a queima (impede voto duplo no escrutínio): como
+-- o HMAC é determinístico enquanto a salt existe, o mesmo token rende o mesmo
+-- vote_key e colide.
 CREATE TABLE IF NOT EXISTS vote (
     id                INTEGER PRIMARY KEY,
     round_id          INTEGER NOT NULL REFERENCES round(id) ON DELETE CASCADE,
-    token             TEXT    NOT NULL REFERENCES token(token),
+    vote_key          TEXT    NOT NULL,
     kind              TEXT    NOT NULL CHECK (kind IN ('candidato', 'branco', 'nulo')),
     votee_elector_id  INTEGER REFERENCES elector(id),
     criado_em         TEXT    NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (round_id, token),
+    UNIQUE (round_id, vote_key),
     -- 'candidato' exige votee; 'branco'/'nulo' exigem votee nulo.
     CHECK ((kind = 'candidato') = (votee_elector_id IS NOT NULL))
 );

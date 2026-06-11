@@ -130,15 +130,19 @@ congress (federação, ano)
                eleito_elector_id?)
        ├─ nomination (elector_id)            ← indicação OPCIONAL (short-list)
        └─ round (nº 1..3; status; restrito_top2: lista de elector_id ou vazio)
-            └─ vote (round_id, token, kind, votee_elector_id)
+            └─ round (..., vote_key_salt?)       ← salt anulada no encerramento (ADR-0013)
+            └─ vote (round_id, vote_key, kind, votee_elector_id)
 elector (delegado: nome, local_id?, nato, [nascimento?], presente)
 token   (pilha cega: token, ativo)            ← NÃO mede presença (ADR-0002)
 ```
 
 Notas do modelo:
 - **`vote` referencia o delegado VOTADO** (`votee_elector_id`, identidade
-  pública), **nunca o votante**. O sigilo segue protegido pelo token cego.
-- Queima atômica permanece: **`UNIQUE(round_id, token)`**.
+  pública), **nunca o votante**. O voto **não guarda o token**: guarda
+  `vote_key = HMAC(salt do escrutínio, token)`, e a salt é **destruída no
+  encerramento** — severando o elo voto↔token de vez (ADR-0013).
+- Queima atômica permanece: **`UNIQUE(round_id, vote_key)`** — o HMAC é
+  determinístico enquanto a salt vive, então o mesmo token colide.
 - **Presença é da PESSOA, não do token** (ADR-0002): `elector.presente` é o
   Livro de Presença, **reversível** (a Mesa registra saída/reentrada). Quórum e
   reconciliação contam `elector.presente`, nunca tokens. Reemitir token (perda) só
@@ -247,8 +251,10 @@ offline, confiança > impacto).
 - `-seed` permanece como ferramenta de desenvolvimento.
 
 ## 7. Sigilo e auditoria
-- **Sigilo:** `vote` nunca referencia o votante; elo único é o token cego, cuja
-  entrega não registra identidade. Candidato/votado é público; voto é secreto.
+- **Sigilo:** `vote` nunca referencia o votante. Não guarda o token, e sim
+  `vote_key = HMAC(salt do escrutínio, token)`; a salt é **destruída no
+  encerramento**, tornando o elo voto↔token irrecuperável mesmo para quem tem o
+  `.db` inteiro (ADR-0013). Candidato/votado é público; voto é secreto.
 - **Reconciliação por escrutínio:** `depositados ≤ presentes`; abstenções =
   presentes − depositados. No telão.
 - **Trilha:** equivalente digital da Ata de Verificação de Poderes (total de

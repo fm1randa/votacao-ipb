@@ -4,9 +4,12 @@ package store
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -66,6 +69,9 @@ func migrate(db *sql.DB) {
 			WHEN 1 THEN 'presidente' WHEN 2 THEN 'vice' WHEN 3 THEN 'sec_executivo'
 			WHEN 4 THEN 'primeiro_sec' WHEN 5 THEN 'segundo_sec' WHEN 6 THEN 'tesoureiro'
 			ELSE role END WHERE role = ''`,
+		// Sigilo do voto (spike 004 / ADR-0013): sem migração — greenfield. Não há
+		// eleição real em arquivo; o schema.sql novo já nasce com vote.vote_key e
+		// round.vote_key_salt. Bancos .db de desenvolvimento são descartáveis.
 	} {
 		db.ExecContext(ctx, q)
 	}
@@ -143,11 +149,33 @@ func (s *Store) TokenIssued(ctx context.Context, token string) (bool, error) {
 	return entregue == 1, err
 }
 
+// hmacHex deriva o vote_key de um token sob a salt do escrutínio (HMAC-SHA256, hex).
+// Determinístico enquanto a salt vive (garante a queima por colisão); irreversível
+// e irreconstruível depois que a salt é anulada no encerramento (ADR-0013).
+func hmacHex(salt []byte, token string) string {
+	mac := hmac.New(sha256.New, salt)
+	mac.Write([]byte(token))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 // HasVoted diz se o token já depositou voto neste escrutínio (estado "já votou").
+// Só tem sentido com o escrutínio ABERTO: depois do encerramento a salt foi
+// anulada e a pergunta "este token votou?" é, por desenho, irrespondível (é o
+// próprio ponto do sigilo) — devolve false.
 func (s *Store) HasVoted(ctx context.Context, roundID int64, token string) (bool, error) {
-	var n int
+	var salt []byte
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM vote WHERE round_id = ? AND token = ?`, roundID, token).Scan(&n)
+		`SELECT vote_key_salt FROM round WHERE id = ?`, roundID).Scan(&salt)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && len(salt) == 0) {
+		return false, nil // escrutínio inexistente ou já encerrado (salt anulada)
+	}
+	if err != nil {
+		return false, err
+	}
+	var n int
+	err = s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM vote WHERE round_id = ? AND vote_key = ?`,
+		roundID, hmacHex(salt, token)).Scan(&n)
 	return n > 0, err
 }
 
@@ -164,17 +192,22 @@ func (s *Store) CastVote(ctx context.Context, roundID int64, token, kind string,
 	defer tx.Rollback()
 
 	// 1) Escrutínio precisa estar aberto e a eleição não pode estar encerrada.
+	//    Carrega a salt do escrutínio (existe enquanto aberto) para derivar o vote_key.
 	var status string
 	var encerrada int
+	var salt []byte
 	err = tx.QueryRowContext(ctx, `
-		SELECT r.status, c.encerrada FROM round r
+		SELECT r.status, c.encerrada, r.vote_key_salt FROM round r
 		JOIN position p ON p.id = r.position_id
-		JOIN congress c ON c.id = p.congress_id WHERE r.id = ?`, roundID).Scan(&status, &encerrada)
+		JOIN congress c ON c.id = p.congress_id WHERE r.id = ?`, roundID).Scan(&status, &encerrada, &salt)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && (status != "aberto" || encerrada == 1)) {
 		return ErrRoundClosed
 	}
 	if err != nil {
 		return err
+	}
+	if len(salt) == 0 {
+		return ErrRoundClosed // sem salt não há como derivar/queimar o vote_key
 	}
 
 	// 2) Token precisa existir e ter sido entregue.
@@ -201,10 +234,12 @@ func (s *Store) CastVote(ctx context.Context, roundID int64, token, kind string,
 		voteeArg = votee
 	}
 
-	// 4) INSERT — a UNIQUE(round_id, token) é a queima.
+	// 4) INSERT — grava o vote_key = HMAC(salt, token), nunca o token. A
+	//    UNIQUE(round_id, vote_key) é a queima: o HMAC é determinístico enquanto
+	//    a salt vive, então o mesmo token rende o mesmo vote_key e colide.
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO vote(round_id, token, kind, votee_elector_id) VALUES (?,?,?,?)`,
-		roundID, token, kind, voteeArg)
+		`INSERT INTO vote(round_id, vote_key, kind, votee_elector_id) VALUES (?,?,?,?)`,
+		roundID, hmacHex(salt, token), kind, voteeArg)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return ErrAlreadyVoted
