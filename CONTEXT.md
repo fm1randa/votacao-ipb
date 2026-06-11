@@ -87,6 +87,8 @@ _Avoid_: Votação, turno (turno serve só para o 3º Escrutínio, o "segundo tu
 
 **Voto**:
 A escolha secreta registrada num Escrutínio: um Delegado votado, ou Branco/Nulo.
+Não guarda o Token, e sim um valor chaveado por Escrutínio (`vote_key = HMAC(salt,
+token)`); a chave é destruída no encerramento, severando o elo Voto↔Token (ADR-0013).
 
 **Branco**:
 Voto de abstenção — o Delegado vota sem escolher ninguém. Conta no denominador.
