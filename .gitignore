@@ -3,6 +3,9 @@ votacao.db
 votacao.db-shm
 votacao.db-wal
 *.db
+*.db-shm
+*.db-wal
+eleicao-ativa
 
 # Binários de build (ancorados na raiz — sem isso, "votacao" casaria com
 # qualquer diretório de mesmo nome, ex. o package Kotlin android/.../app/votacao)
