@@ -29,7 +29,7 @@ A linguagem segue o GTSI da IPB e é toda em **português**. Não invente termos
 - `CONTEXT.md` — glossário (Âmbito, Sociedade, Delegado, Token, Escrutínio,
   Quórum, Indicação, Operação/Histórico…). Consulte antes de nomear qualquer coisa.
 - `SPEC.md` — especificação + log de decisões (maioria, runoff, quórum por âmbito).
-- `docs/adr/0001…0012` — decisões de arquitetura (ex.: ADR-0002 presença ≠ token;
+- `docs/adr/0001…0014` — decisões de arquitetura (ex.: ADR-0002 presença ≠ token;
   ADR-0006 log de operações restaurável; ADR-0009 motor único; ADR-0012 um .db
   por eleição).
 
@@ -56,6 +56,10 @@ A linguagem segue o GTSI da IPB e é toda em **português**. Não invente termos
 - A eleição ativa é trocada a quente: handlers leem o `*store.Store` por
   `s.db()` (`atomic.Pointer`, `internal/web/web.go:40`).
 - Segredo do voto é regra dura: `vote` referencia o **votado**, nunca o votante.
+- Fluxo de trabalho: **nunca commite direto na `main`** — toda mudança via
+  branch + PR. Planos e propostas são **issues no GitHub** (índice: issue #8),
+  não arquivos locais; não crie diretório `plans/`. ADRs ficam em `docs/adr/`
+  e entram via PR.
 
 ## Gotchas
 
