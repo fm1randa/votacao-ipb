@@ -1,7 +1,7 @@
-# Plano 004 — Achados do spike e questões em aberto
+# Plano 004 — Achados do spike e decisões
 
 Spike do sigilo do voto. Protótipo no branch `advisor/004-ballot-secrecy-spike`
-(não fundido). Resultado da medição:
+(não fundido — a fusão é ato do mantenedor). Resultado da medição:
 
 - **Baseline (escrutínio aberto):** o instrumento religa **3 de 3** cédulas a
   votantes nomeados (`TestSegredoDoVoto_VazamentoEnquantoAberto`).
@@ -10,73 +10,52 @@ Spike do sigilo do voto. Protótipo no branch `advisor/004-ballot-secrecy-spike`
 - `go build ./... && go vet ./... && go test ./...` — tudo verde; a queima do
   token e a apuração (Bruno=2, 1 branco, 3 depositados) sobrevivem ao redesenho.
 
-A correção (ADR-0013 proposta) sela o vazamento, mas **não deve ser fundida** sem
-o mantenedor decidir os pontos abaixo.
+As questões em aberto foram **decididas pelo mantenedor** (registradas abaixo).
 
-## 1. Direção 1 vs Direção 2 (a decisão de fundo)
+## 1. Direção 1 vs Direção 2 — DECIDIDO: Direção 1
 
 | | Direção 1 (salt no `.db`, apagada no fecho) | Direção 2 (salt só em memória) |
 |---|---|---|
 | Escrutínio encerrado | seguro | seguro |
-| Backup **mid-round** | **correlacionável** (salt viva) | seguro |
+| Backup **mid-round** | correlacionável (salt viva) | seguro |
 | Recuperação de falha | trivial (salt no banco) | **voto duplo pós-crash** (salt perdida) |
 | Complexidade | baixa (implementada) | exige mitigação de crash |
 
-O protótipo implementa a **Direção 1**. A pergunta: a exposição de um backup
-tirado no meio de um escrutínio é aceitável (D1), ou vale o custo de mitigar a
-recuperação de falha (D2)? Mitigações possíveis para D2: ao reiniciar com
-escrutínio aberto, **forçar o encerramento** dele; ou persistir a salt num
-**arquivo lateral** apagado no fecho (e no boot, se houver salt órfã, encerrar
-o escrutínio). **Decisão pendente.**
+**Decisão: Direção 1.** O modelo de ameaça é um terceiro mal-intencionado
+inspecionando o `.db` **depois** da operação — D1 protege isso por inteiro. A
+Mesa é confiável (eleição de diretoria eclesiástica; pessoas idôneas) e backup
+não é fluxo de uso real hoje, então a janela mid-round é teórica. O custo da D2
+(voto duplo pós-crash numa eleição ao vivo) não compensa o ganho marginal.
+Reabrir a discussão só se o uso real passar a incluir backups contínuos
+manipulados por terceiros não confiáveis.
 
-## 2. Migração de eleições já em arquivo
+## 2. Migração de eleições já em arquivo — DECIDIDO: sem migração (greenfield)
 
-O SQLite não dropa coluna nem troca `UNIQUE` via `ALTER`. O protótipo só
-**acrescenta** `round.vote_key_salt` e `vote.vote_key` (nullable) em bancos
-antigos; o esquema novo só nasce inteiro num `.db` **novo**. Para um arquivo já
-existente, a migração real precisa **recriar a tabela `vote`** (criar nova,
-copiar dados, dropar a antiga, renomear). Questões:
+Não existe eleição real em arquivo (sistema em desenvolvimento). Logo **não há
+legado para migrar**: o `schema.sql` novo já nasce com `vote.vote_key` e
+`round.vote_key_salt`, e os `ALTER` que o protótipo havia adicionado em
+`migrate()` foram **removidos**. Bancos `.db` de desenvolvimento são
+descartáveis (apagar e recriar). A complexidade de recriar a tabela `vote` /
+recusar upgrade com escrutínio aberto **deixa de existir**.
 
-- O que fazer com `vote.token` dos votos **já gravados**? Sem a salt do
-  passado não há como derivar um `vote_key`. Recriar a tabela num banco com
-  votos antigos implica ou descartá-los ou inventar uma salt retroativa (o que
-  reabriria o Elo B). **Provável regra:** só migrar bancos **sem escrutínio em
-  andamento** (entre eleições); recusar a migração com escrutínio aberto.
-- E um escrutínio que estava **aberto** na hora do upgrade? Decidir: encerrar
-  forçado antes de migrar, ou bloquear o upgrade.
+## 3. Desfazer/Restaurar (ADR-0006) — DECIDIDO: sem mudança
 
-## 3. Interação com Desfazer/Restaurar (ADR-0006)
+Sem legado (questão 2), não há snapshots de esquema antigo com `vote.token` para
+transformar. Sobra apenas restaurar um ponto com escrutínio **aberto**: o
+snapshot carrega a salt e restaurá-lo a traz de volta — que é o **estado
+anterior legítimo** (coerente com "desfazer o encerramento reabre a rodada com
+os votos intactos", ADR-0006). **Mantido como está**, sem versionar snapshot nem
+regenerar salt.
 
-`restoreDomain` (operations.go) reinsere as colunas que estão no snapshot JSON.
-Dois problemas:
+## 4. Reduzir também o Elo A? — DECIDIDO: não
 
-- **Snapshots pré-migração** contêm `vote.token` → o INSERT falha no esquema
-  novo (coluna inexistente). Opções: (a) **versionar** o snapshot e transformar
-  na restauração; (b) aceitar que o histórico **pré-migração** de uma eleição
-  não é restaurável (documentar e avisar na UI); (c) migração transforma também
-  os snapshots gravados. Recomendação do spike: (b) para o protótipo, (a) se for
-  a produção.
-- **Snapshots com escrutínio aberto carregam a salt.** Restaurar um ponto em que
-  o escrutínio estava aberto **traz `vote_key_salt` de volta** — reabrindo a
-  janela do Elo B para aquele escrutínio (coerente com "desfazer o encerramento
-  reabre a rodada", ADR-0006, mas agora também ressuscita a salt). Decidir se é
-  aceitável (é o mesmo estado de antes) ou se a restauração deve **regenerar**
-  uma salt nova ao reabrir.
+Severado o Elo B, saber quem tem qual token não revela cédula. Mantêm-se
+`token.entregue_em` e a tabela `token` nos snapshots, úteis à reconciliação da
+Mesa. É o que o ADR-0013 recomenda.
 
-## 4. Reduzir também o Elo A? (defesa em profundidade)
+## 5. Backups já comprometidos — não se aplica
 
-Severado o Elo B, saber quem tem qual token não revela cédula — o Elo B sozinho
-basta para o sigilo, e é o que o ADR-0013 recomenda. Como **defesa em
-profundidade** opcional, poder-se-ia parar de gravar `token.entregue_em` ou
-excluir a tabela `token` dos snapshots. **Não** é necessário para fechar o
-vazamento; fica como decisão separada (custo: perde rastreabilidade da entrega
-de tokens, útil à reconciliação da Mesa).
-
-## 5. Backups já comprometidos
-
-Nada nesta correção redige `.db` que já circulam. Arquivos de eleições passadas
-gravados no esquema antigo continuam deanonimizáveis. Se isso importa, é uma
-ação à parte (orientar operadores a destruir backups antigos, p.ex.).
+Não há `.db` de eleições reais no mundo. Sem ação necessária.
 
 ## 6. Documentação a atualizar quando isto for fundido
 

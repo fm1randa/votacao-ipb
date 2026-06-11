@@ -69,13 +69,9 @@ func migrate(db *sql.DB) {
 			WHEN 1 THEN 'presidente' WHEN 2 THEN 'vice' WHEN 3 THEN 'sec_executivo'
 			WHEN 4 THEN 'primeiro_sec' WHEN 5 THEN 'segundo_sec' WHEN 6 THEN 'tesoureiro'
 			ELSE role END WHERE role = ''`,
-		// Sigilo do voto (spike 004 / ADR-0013): salt por escrutínio + vote_key.
-		// NOTA DE MIGRAÇÃO: bancos antigos têm vote.token (NOT NULL) e a UNIQUE
-		// antiga; o SQLite não dropa coluna nem troca UNIQUE por ALTER. Estes
-		// ALTERs só acrescentam as colunas novas (vote_key fica nullable em banco
-		// antigo) — a migração real exige RECRIAR a tabela vote. Ver plans/004-findings.md.
-		`ALTER TABLE round ADD COLUMN vote_key_salt BLOB`,
-		`ALTER TABLE vote ADD COLUMN vote_key TEXT`,
+		// Sigilo do voto (spike 004 / ADR-0013): sem migração — greenfield. Não há
+		// eleição real em arquivo; o schema.sql novo já nasce com vote.vote_key e
+		// round.vote_key_salt. Bancos .db de desenvolvimento são descartáveis.
 	} {
 		db.ExecContext(ctx, q)
 	}

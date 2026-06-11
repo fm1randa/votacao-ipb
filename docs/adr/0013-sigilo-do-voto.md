@@ -1,9 +1,10 @@
 # Sigilo do voto: severar o elo voto↔token (vote_key com salt por escrutínio)
 
-> **Status: PROPOSTA (spike do Plano 004) — aguarda decisão do mantenedor.**
-> Protótipo no branch `advisor/004-ballot-secrecy-spike`; não fundido. As
-> questões em aberto (Direção 1 vs 2, migração, desfazer/restaurar) estão em
-> `plans/004-findings.md` e precisam ser resolvidas antes de ir a produção.
+> **Status: ACEITA (Plano 004) — decisões cravadas pelo mantenedor; aguarda fusão.**
+> Protótipo no branch `advisor/004-ballot-secrecy-spike`; ainda não fundido (a
+> fusão é ato do mantenedor). Decisões: **Direção 1**; **sem migração**
+> (greenfield — não há eleição real em arquivo); **Desfazer/Restaurar** sem
+> mudança; **Elo A** intocado. Registro detalhado em `plans/004-findings.md`.
 
 ## Contexto — o segredo não era segredo
 
@@ -60,7 +61,7 @@ religações por **qualquer** caminho que o instrumento tenta):
 - `Tally` conta por `votee_elector_id`/`kind` e **nunca** tocava o token — a
   apuração não muda (teste: Bruno=2, 1 branco, 3 depositados, intactos).
 
-## Exposição residual conhecida (Direção 1)
+## Exposição residual conhecida (Direção 1) e por que é aceitável
 
 Enquanto um escrutínio está **aberto**, a salt vive no banco. Um backup tirado
 **no meio** de um escrutínio (uma cédula aberta, alguns minutos) somado à tabela
@@ -68,26 +69,34 @@ Enquanto um escrutínio está **aberto**, a salt vive no banco. Um backup tirado
 encerrados ficam seguros. O teste `TestSegredoDoVoto_VazamentoEnquantoAberto`
 documenta essa janela de propósito (recompõe o HMAC enquanto a salt existe).
 
-**Direção 2** (salt só em memória, nunca no `.db`) fecharia também a janela do
-backup mid-round, ao custo de recuperação de falha: se o processo morre no meio,
-a salt se perde e, ao reiniciar, `HasVoted` não reconhece votos já depositados →
-risco de voto duplo pós-crash. Precisaria de mitigação (forçar encerramento de
-escrutínio aberto ao reiniciar, ou salt num arquivo lateral apagado no fecho). O
-trade-off — janela de backup mid-round (D1) vs voto duplo pós-crash (D2) — é a
-decisão de fundo que o mantenedor precisa cravar (ver findings).
+**Decisão: aceitamos esse resíduo.** O modelo de ameaça é um terceiro
+mal-intencionado inspecionando o `.db` **depois** da operação — e contra isso a
+Direção 1 protege por inteiro (a salt já foi anulada). A Mesa, durante a sessão,
+é confiável (eleição de diretoria em ambiente eclesiástico; quem ocupa a Mesa
+são pessoas idôneas) e já tem o processo vivo em mãos de qualquer modo. Backup
+não é, hoje, um fluxo de uso real do sistema — logo a janela mid-round é teórica.
+
+**Direção 2** (salt só em memória, nunca no `.db`) fecharia também essa janela,
+ao custo de recuperação de falha: se o processo morre no meio, a salt se perde e,
+ao reiniciar, `HasVoted` não reconhece votos já depositados → risco de voto duplo
+pós-crash. O preço (fragilizar a eleição ao vivo justamente num crash) não
+compensa o ganho marginal contra um cenário que não está no modelo de ameaça.
+Fica registrada como alternativa caso o uso real passe a incluir backups
+contínuos por terceiros não confiáveis.
 
 ## Consequências
 
-- **Migração:** o SQLite não dropa coluna nem troca `UNIQUE` por `ALTER`; a
-  migração real exige **recriar a tabela `vote`**. O protótipo só acrescenta as
-  colunas novas via `migrate()` (banco novo nasce certo pelo `schema.sql`).
-- **Desfazer/Restaurar (ADR-0006):** snapshots antigos guardam `vote.token` e
-  falham ao reinserir no esquema novo; e um snapshot tirado com escrutínio
-  **aberto** carrega a salt — restaurá-lo **traz a salt de volta**. Ambos
-  pedem decisão (versionar o snapshot, transformar na restauração, ou aceitar
-  perda de restauração pré-migração). Detalhado em `plans/004-findings.md`.
-- **Backups já vazados:** esta mudança **não redige** `.db` já existentes no
-  mundo; isso é uma decisão à parte.
+- **Sem migração (greenfield):** não há eleição real em arquivo, então o
+  `schema.sql` novo já nasce com `vote.vote_key` e `round.vote_key_salt`; não há
+  caminho de migração nem `ALTER` no `migrate()`. Bancos `.db` de
+  desenvolvimento são descartáveis (apagar e recriar).
+- **Desfazer/Restaurar (ADR-0006): sem mudança.** Como não há snapshots de
+  esquema antigo, sobra só o caso de restaurar um ponto com escrutínio **aberto**:
+  o snapshot carrega a salt e restaurá-lo **a traz de volta** — que é exatamente
+  o estado anterior legítimo (coerente com "desfazer o encerramento reabre a
+  rodada com os votos intactos"). Mantido como está.
 - **Regra permanente:** qualquer feature futura que precise consultar "este
   token votou?" **depois** do encerramento é incompatível com o sigilo e deve
   ser rejeitada.
+- **Ao fundir:** atualizar `CLAUDE.md` e `SPEC.md`/`CONTEXT.md` — `vote` guarda
+  um valor chaveado por escrutínio, não o token, e a chave é destruída no fecho.
