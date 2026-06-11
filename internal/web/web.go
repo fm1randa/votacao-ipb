@@ -18,6 +18,10 @@ import (
 	"votacao-ipb/internal/store"
 )
 
+// Version é injetada no build via -ldflags
+// "-X votacao-ipb/internal/web.Version=v0.N+sha" (ADR-0014).
+var Version = "dev"
+
 //go:embed templates/*.html
 var templatesFS embed.FS
 
@@ -179,6 +183,7 @@ func New(mgr *store.Elections, st *store.Store, addr, host string) (*Server, err
 	s := &Server{mgr: mgr, hub: newHub(), addr: addr, host: host}
 	s.cur.Store(st)
 	funcs := template.FuncMap{
+		"versao":    func() string { return Version },
 		"term":      s.term,
 		"ambito":    func() string { return s.cong().Ambito },
 		"sociedade": func() string { return s.cong().Sociedade },

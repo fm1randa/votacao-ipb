@@ -19,41 +19,15 @@ OUT="android/app/src/main/jniLibs/arm64-v8a"
 mkdir -p "$OUT"
 
 echo "==> go build (linux/arm64, PIE)"
+LDFLAGS=""
+if [[ -n "${VERSION:-}" ]]; then
+  LDFLAGS="-X votacao-ipb/internal/web.Version=${VERSION}"
+fi
 GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -buildmode=pie -trimpath \
-  -o "$OUT/libvotacao.so" .
+  -ldflags "$LDFLAGS" -o "$OUT/libvotacao.so" .
 
 echo "==> patch ELF p/ Android (PT_INTERP -> linker64; PT_TLS align -> 64)"
-python3 - "$OUT/libvotacao.so" <<'EOF'
-import struct, sys
-ANDROID_LINKER = b'/system/bin/linker64\x00'
-path = sys.argv[1]
-with open(path, 'r+b') as f:
-    data = bytearray(f.read())
-    assert data[:4] == b'\x7fELF' and data[4] == 2, 'esperava ELF64'
-    e_phoff = struct.unpack_from('<Q', data, 0x20)[0]
-    e_phentsize = struct.unpack_from('<H', data, 0x36)[0]
-    e_phnum = struct.unpack_from('<H', data, 0x38)[0]
-    PT_INTERP, PT_TLS = 3, 7
-    for i in range(e_phnum):
-        off = e_phoff + i * e_phentsize
-        p_type = struct.unpack_from('<I', data, off)[0]
-        if p_type == PT_INTERP:
-            p_offset = struct.unpack_from('<Q', data, off + 0x08)[0]
-            p_filesz = struct.unpack_from('<Q', data, off + 0x20)[0]
-            old = bytes(data[p_offset:p_offset + p_filesz])
-            if old != ANDROID_LINKER.ljust(p_filesz, b'\x00'):
-                assert len(ANDROID_LINKER) <= p_filesz, 'interp novo não cabe no segmento'
-                # sobrescreve in-place com padding NUL — o kernel lê a C-string
-                data[p_offset:p_offset + p_filesz] = ANDROID_LINKER.ljust(p_filesz, b'\x00')
-                print(f'   PT_INTERP: {old.rstrip(bytes(1)).decode()} -> /system/bin/linker64')
-        elif p_type == PT_TLS:
-            p_align = struct.unpack_from('<Q', data, off + 0x30)[0]
-            if p_align < 64:
-                struct.pack_into('<Q', data, off + 0x30, 64)
-                print(f'   PT_TLS p_align: {p_align} -> 64')
-    f.seek(0); f.write(data)
-    print('   ok')
-EOF
+python3 "$(dirname "$0")/patch-elf-android.py" "$OUT/libvotacao.so"
 
 ls -lh "$OUT/libvotacao.so"
-echo "==> pronto. Agora: cd android && gradle assembleDebug"
+echo "==> pronto. Agora: cd android && ./gradlew assembleDebug"

@@ -91,6 +91,25 @@ android/build-go.sh           compila o servidor Go → jniLibs/arm64-v8a/libvot
 > O repositório é um **monorepo**: o app Android mora em `android/` (projeto
 > Gradle standalone, fora do go.mod).
 
+## Releases
+
+Cada push na `main` publica automaticamente uma release `v0.N` (N = contagem
+de commits) no GitHub Releases com cinco artefatos:
+
+| Arquivo | Plataforma |
+|---------|-----------|
+| `votacao-v0.N-windows-amd64.exe` | Windows (notebook da mesa) |
+| `votacao-v0.N-linux-amd64` | Linux x86-64 |
+| `votacao-v0.N-darwin-arm64` | macOS Apple Silicon |
+| `votacao-v0.N-termux-arm64` | Android/Termux (PIE, já patcheado) |
+| `votacao-v0.N.apk` | APK Android assinado |
+
+A versão aparece no **rodapé da sidebar da Mesa** e na **linha de log** ao
+subir o servidor (`votação v0.N+sha no ar em http://...`), tornando simples
+confirmar qual código está rodando no dia da eleição, mesmo sem internet.
+
+Decisão de arquitetura: [ADR-0014](docs/adr/0014-releases-continuas-da-main.md).
+
 ## Várias eleições e reset
 
 Cada eleição vive num **arquivo SQLite próprio** na pasta de dados (ADR-0012).
@@ -120,20 +139,26 @@ Driver SQLite é puro-Go (`modernc.org/sqlite`) → binário estático, sem depe
 Dá pra hospedar o sistema **no próprio celular**, servindo pelo hotspot — sem
 notebook. Testado na prática; a receita tem pegadinhas:
 
-1. **Build** (no computador):
-   ```bash
-   GOOS=linux GOARCH=arm64 go build -buildmode=pie -o votacao-android .
-   ```
-   O `-buildmode=pie` é obrigatório — sem ele o loader do Android rejeita o
-   binário (`unexpected e_type: 2`).
+1. **Obtenha o binário** — duas opções:
+   - **Mais fácil:** baixe `votacao-v0.N-termux-arm64` direto da
+     [página de releases](../../releases) — ele já está patcheado para o
+     Bionic (PT_INTERP + PT_TLS), então o passo 4 (`termux-elf-cleaner`)
+     **não é necessário** para o artefato de release.
+   - **Build local** (no computador):
+     ```bash
+     GOOS=linux GOARCH=arm64 go build -buildmode=pie -o votacao-android .
+     ```
+     O `-buildmode=pie` é obrigatório — sem ele o loader do Android rejeita o
+     binário (`unexpected e_type: 2`). Neste caso o passo 4 ainda é necessário.
 2. **Instale o Termux pelo F-Droid** (a versão da Play Store é abandonada).
 3. Copie o binário pro aparelho e **mova para o `$HOME` do Termux** — o storage
    compartilhado (`/sdcard`) é montado `noexec`:
    ```bash
    mv /sdcard/Download/votacao-android ~/ && chmod +x ~/votacao-android
    ```
-4. **Conserte o alinhamento TLS** (o linker do Go alinha em 8 bytes; a Bionic
-   ARM64 exige 64 — sem isso: `TLS segment is underaligned`):
+4. **Conserte o alinhamento TLS** (somente se fez build local — o artefato de
+   release já vem patcheado; o linker do Go alinha em 8 bytes; a Bionic ARM64
+   exige 64 — sem isso: `TLS segment is underaligned`):
    ```bash
    pkg install termux-elf-cleaner
    termux-elf-cleaner votacao-android

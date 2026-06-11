@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# Serializa releases concorrentes; não cancela — cada push vira release (ADR-0014).
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (race + coverage)
+        run: go test -race -cover ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # versão = contagem de commits da main (ADR-0014)
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Versão (v0.N, N = contagem de commits)
+        id: ver
+        run: |
+          N=$(git rev-list --count HEAD)
+          SHA=$(git rev-parse --short HEAD)
+          {
+            echo "n=$N"
+            echo "tag=v0.$N"
+            echo "full=v0.$N+$SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Binários Go (windows, linux, darwin, termux)
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          LDFLAGS="-X votacao-ipb/internal/web.Version=${{ steps.ver.outputs.full }}"
+          TAG=${{ steps.ver.outputs.tag }}
+          mkdir -p dist
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o "dist/votacao-$TAG-windows-amd64.exe" .
+          GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o "dist/votacao-$TAG-linux-amd64" .
+          GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o "dist/votacao-$TAG-darwin-arm64" .
+          # Termux: PIE + patch ELF (mesmo do APK) — dispensa termux-elf-cleaner no aparelho.
+          GOOS=linux GOARCH=arm64 go build -buildmode=pie -trimpath -ldflags "$LDFLAGS" -o "dist/votacao-$TAG-termux-arm64" .
+          python3 android/patch-elf-android.py "dist/votacao-$TAG-termux-arm64"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: APK assinado
+        env:
+          VERSION: ${{ steps.ver.outputs.full }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > /tmp/votacao-release.jks
+          export ANDROID_KEYSTORE_FILE=/tmp/votacao-release.jks
+          bash android/build-go.sh
+          (cd android && ./gradlew --no-daemon :app:assembleRelease \
+            -PvotacaoVersionCode=${{ steps.ver.outputs.n }} \
+            -PvotacaoVersionName=0.${{ steps.ver.outputs.n }})
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            "dist/votacao-${{ steps.ver.outputs.tag }}.apk"
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" dist/* \
+            --title "${{ steps.ver.outputs.tag }}" --generate-notes

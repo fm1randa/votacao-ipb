@@ -11,8 +11,8 @@ android {
         applicationId = "app.votacao.host"
         minSdk = 26 // LocalOnlyHotspot exige API 26+
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1-spike"
+        versionCode = (project.findProperty("votacaoVersionCode") as String?)?.toInt() ?: 1
+        versionName = (project.findProperty("votacaoVersionName") as String?) ?: "0.0-dev"
         ndk { abiFilters += "arm64-v8a" }
     }
 
@@ -23,10 +23,23 @@ android {
         jniLibs { useLegacyPackaging = true }
     }
 
+    val releaseKeystore = System.getenv("ANDROID_KEYSTORE_FILE")
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug { }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {
