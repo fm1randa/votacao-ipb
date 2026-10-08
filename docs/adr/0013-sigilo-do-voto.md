@@ -98,5 +98,5 @@ contínuos por terceiros não confiáveis.
 - **Regra permanente:** qualquer feature futura que precise consultar "este
   token votou?" **depois** do encerramento é incompatível com o sigilo e deve
   ser rejeitada.
-- **Ao fundir:** atualizar `CLAUDE.md` e `SPEC.md`/`CONTEXT.md` — `vote` guarda
+- **Ao fundir:** atualizar `CLAUDE.md` e `SPEC.md`/`GLOSSARY.md` — `vote` guarda
   um valor chaveado por escrutínio, não o token, e a chave é destruída no fecho.
