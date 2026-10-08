@@ -26,7 +26,7 @@ Driver SQLite é puro-Go (`modernc.org/sqlite`) — binário estático, sem cgo.
 
 A linguagem segue o GTSI da IPB e é toda em **português**. Não invente termos.
 
-- `CONTEXT.md` — glossário (Âmbito, Sociedade, Delegado, Token, Escrutínio,
+- `GLOSSARY.md` — glossário (Âmbito, Sociedade, Delegado, Token, Escrutínio,
   Quórum, Indicação, Operação/Histórico…). Consulte antes de nomear qualquer coisa.
 - `SPEC.md` — especificação + log de decisões (maioria, runoff, quórum por âmbito).
 - `docs/adr/0001…0014` — decisões de arquitetura (ex.: ADR-0002 presença ≠ token;

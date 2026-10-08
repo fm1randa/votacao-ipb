@@ -90,7 +90,7 @@ func (s *Server) cong() store.Congress {
 	return c
 }
 
-// term traduz o vocabulário da UI conforme âmbito e sociedade (CONTEXT.md):
+// term traduz o vocabulário da UI conforme âmbito e sociedade (GLOSSARY.md):
 // local fala "Sócio/Plenária/Chamada"; federados, "Delegado/Congresso/Credenciar";
 // a SAF flexiona no feminino (Sócia, Delegada).
 func (s *Server) term(key string) string {

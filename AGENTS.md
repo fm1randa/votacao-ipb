@@ -14,5 +14,5 @@ da IPB (Go + SQLite, roda numa LAN sem internet).
 ## Onde ler
 
 - `CLAUDE.md` — guia completo (build, testes, layout, convenções, gotchas).
-- `CONTEXT.md` — glossário do domínio (termos do GTSI da IPB).
+- `GLOSSARY.md` — glossário do domínio (termos do GTSI da IPB).
 - `SPEC.md` — especificação + log de decisões.

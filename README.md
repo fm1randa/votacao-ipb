@@ -6,7 +6,7 @@ qualquer âmbito (local, Federação, Conf. Sinodal, Conf. Nacional) — rodando
 **sem internet** numa LAN local (notebook da mesa + roteador de viagem).
 Binário único em Go, banco SQLite. BYOD (celular) + quiosque + telão.
 
-> Especificação completa em [SPEC.md](SPEC.md); glossário em [CONTEXT.md](CONTEXT.md);
+> Especificação completa em [SPEC.md](SPEC.md); glossário em [GLOSSARY.md](GLOSSARY.md);
 > decisões em [docs/adr/](docs/adr/). Base normativa: GTSI 2015 (Art. 26, 49–52, 90–91).
 
 ## Decisões fechadas
