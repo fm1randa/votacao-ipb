@@ -33,7 +33,7 @@ Modos de rede (seletor na tela; a escolha fica lembrada):
 
 ## Pré-requisitos
 
-- macOS com Xcode 16+ (testado com 16.4 e com o SDK do 27.2) e Go (o do `go.mod`).
+- macOS com Xcode 16+ (testado com 16.4) e Go (o do `go.mod`).
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`),
   só se for alterar o `project.yml`. O `.xcodeproj` gerado já vem versionado.
 - Nenhuma dependência Swift de terceiros. O QR é gerado com CoreImage.
