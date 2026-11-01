@@ -24,3 +24,9 @@ android/app/build/
 android/local.properties
 android/app/src/main/jniLibs/
 *.apk
+
+# App iOS (ios/) — servidor Go compilado e artefatos do Xcode
+ios/build/
+ios/VotacaoGo.xcframework/
+ios/VotacaoHost.xcodeproj/xcuserdata/
+ios/VotacaoHost.xcodeproj/project.xcworkspace/xcuserdata/
