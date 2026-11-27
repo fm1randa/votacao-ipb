@@ -33,15 +33,18 @@
   {{else}}
     <div class="card">
       <h2>Hotspot do Mac <span class="pill off">desligado</span></h2>
-      {{if and .Hotspot.NAT (not .Hotspot.WiFi)}}
+      {{if and .Hotspot.NAT .Hotspot.WiFi (not .Hotspot.OrigemAtiva)}}
+        <p><span class="pill warn">atenção</span> O Compartilhamento de Internet está ligado com o Wi-Fi marcado, mas a origem <strong>{{.Hotspot.Origem}}</strong> está sem conexão. O macOS só cria a rede Wi-Fi quando a origem está ativa.</p>
+        <p class="mut">Ligue um cabo de rede no Mac (adaptador USB-Ethernet num roteador ou modem, mesmo sem internet) ou um iPhone via USB, e escolha essa conexão em <strong>Compartilhar conexão de</strong>. Sem nada disso, use o roteador (hotspot) de um celular.</p>
+      {{else if and .Hotspot.NAT (not .Hotspot.WiFi)}}
         <p><span class="pill warn">atenção</span> O Compartilhamento de Internet está ligado, mas sem o Wi-Fi marcado. Os celulares não conseguem entrar.</p>
       {{else}}
-        <p class="mut">Sem roteador por perto, o próprio Mac pode criar a rede Wi-Fi. Faça uma vez:</p>
+        <p class="mut">Sem roteador por perto, o próprio Mac pode criar a rede Wi-Fi. Precisa de uma conexão de origem ativa que não seja Wi-Fi (cabo de rede ou iPhone via USB). Faça uma vez:</p>
       {{end}}
       <ol style="line-height:1.6; padding-left:1.2em">
         <li>Use o botão <strong>Abrir Compartilhamento no Mac</strong> abaixo: ele abre os Ajustes do Sistema no Mac do servidor.</li>
         <li>Clique no <strong>ⓘ</strong> ao lado de <strong>Compartilhamento de Internet</strong>.</li>
-        <li>Em <strong>Compartilhar conexão de</strong>, escolha <strong>Ponte Thunderbolt</strong> (ou qualquer opção que não seja Wi-Fi). Não precisa ter internet.</li>
+        <li>Em <strong>Compartilhar conexão de</strong>, escolha a conexão ativa (cabo de rede ou iPhone USB). Não precisa ter internet, mas precisa estar conectada.</li>
         <li>Em <strong>Com computadores que usam</strong>, marque <strong>Wi-Fi</strong>. Em <strong>Opções de Wi-Fi</strong>, defina o nome da rede e uma senha.</li>
         <li>Clique em OK e ligue o <strong>Compartilhamento de Internet</strong>. Esta tela atualiza sozinha.</li>
       </ol>

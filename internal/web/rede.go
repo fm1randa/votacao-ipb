@@ -17,12 +17,14 @@ import (
 
 // HotspotMac é o estado do Compartilhamento de Internet do macOS.
 type HotspotMac struct {
-	Suportado bool   // só no macOS
-	NAT       bool   // Compartilhamento de Internet ligado
-	WiFi      bool   // "Wi-Fi" marcado em "Com computadores que usam"
-	Rede      string // nome da rede Wi-Fi criada pelo Mac
-	Interface string // bridge do compartilhamento (ex. bridge101)
-	IP        string // IP do Mac nessa rede — o que os celulares devem abrir
+	Suportado   bool   // só no macOS
+	NAT         bool   // Compartilhamento de Internet ligado
+	WiFi        bool   // "Wi-Fi" marcado em "Com computadores que usam"
+	Origem      string // "Compartilhar conexão de" (nome legível)
+	OrigemAtiva bool   // a origem tem IPv4 — sem isso o macOS não sobe o Wi-Fi
+	Rede        string // nome da rede Wi-Fi criada pelo Mac
+	Interface   string // bridge do compartilhamento (ex. bridge101)
+	IP          string // IP do Mac nessa rede — o que os celulares devem abrir
 }
 
 // Ligado diz se os celulares já conseguem entrar na rede do Mac.
