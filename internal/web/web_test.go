@@ -225,6 +225,58 @@ func TestVotoPeloHTTP(t *testing.T) {
 	}
 }
 
+// --- Telão: diretoria eleita ------------------------------------------------
+
+// Encerrada a eleição, o telão fixo deixa o último escrutínio e passa a
+// apresentar a diretoria eleita (cargo → nome).
+func TestTelaoMostraDiretoriaAoEncerrarEleicao(t *testing.T) {
+	ctx := context.Background()
+	srv, st := newTestServer(t)
+	round, token := abreRoundHTTP(t, st)
+	cands, err := st.VotableElectors(ctx, round)
+	if err != nil || len(cands) == 0 {
+		t.Fatalf("sem candidatos: %v", err)
+	}
+	if err := st.CastVote(ctx, round, token, "candidato", cands[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.EncerrarEscrutinio(ctx, round); err != nil {
+		t.Fatal(err)
+	}
+
+	ts := httptest.NewServer(srv.Routes())
+	defer ts.Close()
+	fragmento := func() string {
+		t.Helper()
+		resp, err := http.Get(ts.URL + "/screen/fragment")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b)
+	}
+
+	if html := fragmento(); strings.Contains(html, "Diretoria eleita") {
+		t.Fatal("eleição em andamento não deveria mostrar a diretoria eleita")
+	}
+
+	cong, err := st.FirstCongress(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.EncerrarEleicao(ctx, cong.ID); err != nil {
+		t.Fatal(err)
+	}
+	html := fragmento()
+	if !strings.Contains(html, "Diretoria eleita") || !strings.Contains(html, cands[0].Nome) {
+		t.Fatalf("telão não mostrou a diretoria eleita com %q:\n%s", cands[0].Nome, html)
+	}
+	if !strings.Contains(html, "Não eleito") {
+		t.Fatal("cargos sem eleito deveriam aparecer como \"Não eleito\"")
+	}
+}
+
 // --- Versão no rodapé da Mesa -----------------------------------------------
 
 func TestVersaoNoRodapeDaMesa(t *testing.T) {

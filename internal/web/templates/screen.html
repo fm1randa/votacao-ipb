@@ -11,13 +11,63 @@
   .t-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center; margin-top:6px; }
   .t-stat .num { display:block; }
   .t-stat .mut { font-size:.82rem; }
+  .t-line { margin:11px 0; }
+  .t-line .votos { font-weight:700; }
+  .t-qr { display:flex; align-items:center; justify-content:center; gap:18px; }
+  .t-qr img { width:108px; border-radius:10px; flex:none; background:#fff; }
+  .t-progresso { text-align:center; }
+  .t-diretoria { display:grid; gap:12px; }
+  .t-final .t-head { text-align:center; }
+  .t-cargo { text-align:center; margin:0; }
+  .t-cargo .eyebrow { margin:0 0 .25em; }
+  .t-cargo .nome { font-size:1.5rem; font-weight:700; line-height:1.15; margin:0; color:var(--gold); }
+  .t-cargo.vago .nome { color:var(--muted); font-weight:600; }
+  /* Eleição encerrada: a diretoria toma o telão, sem o convite para votar. */
+  #telao-live:has(.t-final) + .t-qr { display:none; }
+
+  /* Projetor (≥980px): tudo escala com a largura da tela, para ser lido do
+     fundo do salão. A base de 1rem vira ~22px num 1080p (e encolhe em telas baixas, p/ caber sem rolagem). */
   @media (min-width:980px) {
-    .t-wrap h1 { font-size:2.6rem; }
-    .t-wrap .big { font-size:4.2rem; }
-    .t-wrap .bar { height:16px; }
-    .t-cols { display:grid; grid-template-columns:5fr 4fr; gap:0 16px; align-items:start; }
-    .t-stats { grid-template-columns:repeat(6,1fr); }
+    html { font-size:clamp(14px, min(1.15vw, 2.05vh), 30px); }
+    body { font-size:1.05rem; }
+    .t-wrap { max-width:min(94vw, 1800px); padding-top:1.2rem; padding-bottom:1rem; }
+    .t-wrap .brand--screen { margin:0 0 .6rem; }
+    .t-wrap .brand--screen img { height:3.6rem; }
+    .t-wrap .card { padding:1rem 1.4rem; margin-bottom:.7rem; border-radius:20px; }
+    .t-wrap .eyebrow { font-size:.95rem; }
+    .t-wrap h1 { font-size:2.7rem; margin:0 0 .1em; }
+    .t-wrap h2 { font-size:1.35rem; }
+    .t-wrap .pill { font-size:1rem; padding:.2em .8em; }
+    .t-wrap .big { font-size:3.9rem; line-height:1.05; }
+    .t-wrap .bar { height:1.1rem; border-radius:.6rem; }
+    .t-wrap .bar>span { border-radius:.6rem; }
     .t-head { text-align:center; }
+    .t-cols { display:grid; grid-template-columns:1fr 1fr; gap:0 1.1rem; align-items:stretch; }
+    .t-cols > * > .card { height:calc(100% - .7rem); box-sizing:border-box; }
+    .t-cols .eleito { display:flex; flex-direction:column; justify-content:center; }
+    .t-sub { font-size:1.25rem; }
+    .t-line { margin:.6rem 0; }
+    .t-line .row { font-size:1.45rem; margin-bottom:.3rem; }
+    .t-line .votos { font-size:1.7rem; }
+    .t-stats { grid-template-columns:repeat(6,1fr); margin-top:.4rem; }
+    .t-stat .num { font-size:2.8rem; }
+    .t-stat .mut { font-size:1.05rem; }
+    .t-progresso .big { font-size:8rem; }
+    .t-progresso .big .de { font-size:3rem; }
+    .t-progresso .t-sub { font-size:1.6rem; margin:.2em 0 .6em; }
+    .t-progresso .bar { height:1.6rem; }
+    .t-qr { gap:1.2rem; padding:.7rem 1.4rem !important; }
+    .t-qr img { width:6.5rem; border-radius:12px; }
+    .t-qr strong { font-size:1.5rem; }
+    .t-qr .mut { font-size:1.35rem; }
+    .t-wrap:has(.t-final) { padding-bottom:0; }
+    .t-final { min-height:calc(100vh - 1.2rem); display:flex; flex-direction:column; justify-content:center; }
+    .t-final .t-head { margin-bottom:1.4rem; }
+    .t-final h1 { font-size:3.4rem; }
+    .t-diretoria { display:flex; flex-wrap:wrap; justify-content:center; gap:1.2rem; }
+    .t-cargo { flex:0 1 calc((100% - 2.4rem) / 3); box-sizing:border-box; padding:2rem 1.2rem; margin:0 !important; }
+    .t-cargo .eyebrow { font-size:1.15rem; }
+    .t-cargo .nome { font-size:2.7rem; }
   }
 </style>
 {{end}}
@@ -30,8 +80,8 @@
       <div id="telao-live" hx-get="/screen/{{.Round.ID}}/fragment" hx-trigger="sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
         {{template "telaoLive" .}}
       </div>
-      <div class="card" style="display:flex; align-items:center; justify-content:center; gap:18px">
-        <img src="/qr.png" alt="QR code de acesso" style="width:108px; border-radius:10px; flex:none">
+      <div class="card t-qr">
+        <img src="/qr.png" alt="QR code de acesso">
         <div><strong>Vote pelo celular</strong><br><span class="mut">{{baseURL}}</span></div>
       </div>
       <a class="ghost btn" href="/">Voltar ao início</a>
@@ -50,9 +100,9 @@
 
   {{if eq .Round.Status "aberto"}}
     {{/* ADR-0001: enquanto aberto, só progresso — nunca placar por candidato. */}}
-    <div class="card" style="text-align:center">
-      <div class="big">{{.Depositados}} <span class="mut" style="font-size:1.4rem">de</span> {{.Presentes}}</div>
-      <p class="mut">votaram</p>
+    <div class="card t-progresso">
+      <div class="big">{{.Depositados}} <span class="mut de" style="font-size:1.4rem">de</span> {{.Presentes}}</div>
+      <p class="mut t-sub">votaram</p>
       <div class="bar" style="margin-top:6px"><span style="width:{{pct .Depositados .Presentes}}%"></span></div>
     </div>
   {{else}}
@@ -62,7 +112,7 @@
           <div class="card eleito reveal" style="text-align:center">
             <p class="eyebrow" style="color:var(--gold)">Eleito</p>
             <p class="big" style="margin:.1em 0">{{.Eleito.Nome}}</p>
-            <p class="mut">{{.Eleito.Votos}} votos{{if .Round.Runoff}} · 2º turno{{else}} · maioria exigida: {{.Maioria}}{{end}}</p>
+            <p class="mut t-sub">{{.Eleito.Votos}} votos{{if .Round.Runoff}} · 2º turno{{else}} · maioria exigida: {{.Maioria}}{{end}}</p>
           </div>
         {{else if .EmpateNaoResolvido}}
           <div class="card reveal" style="border:2px solid var(--gold)">
@@ -76,9 +126,9 @@
 
       <div class="card">
         {{range .Lines}}
-          <div style="margin:11px 0">
+          <div class="t-line">
             <div class="row"><strong>{{.Nome}}{{if .LocalNome}} <span class="mut">· {{.LocalNome}}</span>{{end}}</strong>
-              <span>{{.Votos}}{{if .Eleito}} ✓{{end}}</span></div>
+              <span class="votos">{{.Votos}}{{if .Eleito}} ✓{{end}}</span></div>
             <div class="bar"><span style="width:{{pct .Votos $.Depositados}}%"></span></div>
           </div>
         {{else}}<p class="mut">Sem votos em candidatos.</p>{{end}}

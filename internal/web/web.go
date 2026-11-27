@@ -480,6 +480,16 @@ func (s *Server) screenCurrentFragment(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	// Eleição encerrada: o telão passa a apresentar a diretoria eleita.
+	if cong.Encerrada {
+		pos, err := s.db().Positions(ctx, cong.ID)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		s.render(w, "telaoDiretoria", map[string]any{"Congresso": cong, "Cargos": pos})
+		return
+	}
 	rd, ok, err := s.db().LatestRound(ctx, cong.ID)
 	if err != nil {
 		fail(w, err)

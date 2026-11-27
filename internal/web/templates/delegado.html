@@ -10,8 +10,28 @@
       {{template "delegadoLive" .}}
     </div>
   </div>
-  <form method="post" action="/delegado/logout"><button class="ghost">Sair</button></form>
-</div></body></html>{{end}}
+  <button type="button" class="ghost" data-modal="m-sair">Sair</button>
+</div>
+
+<!-- Sair derruba a sessão: para voltar, o votante precisa digitar o token de novo. -->
+<div class="modal-backdrop" id="m-sair" role="dialog" aria-modal="true" aria-labelledby="m-sair-titulo"><div class="modal">
+  <h2 id="m-sair-titulo">Sair da eleição?</h2>
+  <p class="mut">Para entrar de novo e votar nos próximos escrutínios, você vai precisar digitar o seu token outra vez.</p>
+  <form method="post" action="/delegado/logout"><button type="submit">Sim, sair</button></form>
+  <button type="button" class="ghost" data-close>Continuar na eleição</button>
+</div></div>
+<script>
+  document.addEventListener('click', function(e){
+    var open = e.target.closest('[data-modal]');
+    if (open) { document.getElementById(open.dataset.modal).classList.add('open'); return; }
+    if (e.target.closest('[data-close]')) { e.target.closest('.modal-backdrop').classList.remove('open'); return; }
+    if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach(function(m){ m.classList.remove('open'); });
+  });
+</script>
+</body></html>{{end}}
 
 {{define "delegadoLive"}}
   {{if eq .Estado "aberta"}}
