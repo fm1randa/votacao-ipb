@@ -8,8 +8,8 @@
       <div id="telao-live" hx-get="/screen/fragment" hx-trigger="load, sse:tick, every 30s" hx-target="this" hx-swap="innerHTML">
         <p class="mut" style="text-align:center; padding:40px 0">Carregando…</p>
       </div>
-      <div class="card" style="display:flex; align-items:center; justify-content:center; gap:18px">
-        <img src="/qr.png" alt="QR code de acesso" style="width:108px; border-radius:10px; flex:none">
+      <div class="card t-qr">
+        <img src="/qr.png" alt="QR code de acesso">
         <div><strong>Vote pelo celular</strong><br><span class="mut">{{baseURL}}</span></div>
       </div>
     </div>
@@ -22,5 +22,23 @@
     <p class="eyebrow" style="color:var(--gold)">{{entidade}}</p>
     <h1>{{term "EventoEleicao"}} • {{.Congresso.Ano}}</h1>
     <p class="mut">O telão será exibido quando a mesa abrir o primeiro escrutínio.</p>
+  </div>
+{{end}}
+
+{{define "telaoDiretoria"}}
+  <div class="t-final">
+    <div class="t-head">
+      <div class="brand brand--screen"><img src="/assets/img/logo_ipb3.png" alt="Igreja Presbiteriana do Brasil"></div>
+      <p class="eyebrow" style="color:var(--gold)">{{entidade}} · {{term "EventoEleicao"}} {{.Congresso.Ano}}</p>
+      <h1>Diretoria eleita</h1>
+    </div>
+    <div class="t-diretoria">
+      {{range .Cargos}}
+        <div class="card t-cargo reveal{{if .EleitoNome}} eleito{{else}} vago{{end}}">
+          <p class="eyebrow">{{.Nome}}</p>
+          <p class="nome">{{with .EleitoNome}}{{.}}{{else}}Não eleito{{end}}</p>
+        </div>
+      {{end}}
+    </div>
   </div>
 {{end}}
