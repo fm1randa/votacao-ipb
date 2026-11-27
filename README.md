@@ -86,10 +86,12 @@ internal/web/templates/       html/template embutidos
 android/                      app Android "casca fina" (SPIKE) — hospeda o servidor
                               no celular: LocalOnlyHotspot + 2 QR codes; ver android/README.md
 android/build-go.sh           compila o servidor Go → jniLibs/arm64-v8a/libvotacao.so
+ios/                          app iOS "casca fina" — mesmo servidor rodando no processo
+                              do app (c-archive); Acesso Pessoal + QR; ver ios/README.md
 ```
 
 > O repositório é um **monorepo**: o app Android mora em `android/` (projeto
-> Gradle standalone, fora do go.mod).
+> Gradle standalone, fora do go.mod) e o app iOS em `ios/` (projeto Xcode).
 
 ## Releases
 

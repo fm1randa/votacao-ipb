@@ -1,0 +1,79 @@
+# Projeto Xcode gerado pelo XcodeGen: `cd ios && xcodegen` recria o
+# VotacaoHost.xcodeproj a partir deste arquivo (fonte da verdade).
+name: VotacaoHost
+options:
+  bundleIdPrefix: app.votacao
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: pt-BR
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.0-dev"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  VotacaoHost:
+    type: application
+    platform: iOS
+    sources:
+      - VotacaoHost
+    dependencies:
+      - framework: VotacaoGo.xcframework
+        embed: false # biblioteca estática: vai linkada no binário do app
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.votacao.host # o mesmo do app Android
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: "Votação"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "O servidor de votação atende os celulares dos votantes e o telão na rede local."
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_FILE: VotacaoHost/Info.plist
+        # O runtime de rede do Go (cgo) usa a libresolv do sistema.
+        OTHER_LDFLAGS: "-lresolv"
+        CODE_SIGN_STYLE: Automatic
+  VotacaoHostTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - VotacaoHostTests
+    dependencies:
+      - target: VotacaoHost
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: app.votacao.host.tests
+  VotacaoHostUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - VotacaoHostUITests
+    dependencies:
+      - target: VotacaoHost
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: app.votacao.host.uitests
+        TEST_TARGET_NAME: VotacaoHost
+schemes:
+  VotacaoHost:
+    build:
+      targets:
+        VotacaoHost: all
+        VotacaoHostTests: [test]
+        VotacaoHostUITests: [test]
+      preActions:
+        # Compila o servidor Go (xcframework) se ainda não existir.
+        - script: |
+            export PATH="/opt/homebrew/bin:/usr/local/go/bin:/usr/local/bin:$PATH"
+            [ -d "$SRCROOT/VotacaoGo.xcframework" ] || "$SRCROOT/build-go.sh"
+          settingsTarget: VotacaoHost
+    test:
+      targets:
+        - VotacaoHostTests
+        - VotacaoHostUITests

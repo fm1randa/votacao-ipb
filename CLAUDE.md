@@ -29,13 +29,14 @@ A linguagem segue o GTSI da IPB e é toda em **português**. Não invente termos
 - `GLOSSARY.md` — glossário (Âmbito, Sociedade, Delegado, Token, Escrutínio,
   Quórum, Indicação, Operação/Histórico…). Consulte antes de nomear qualquer coisa.
 - `SPEC.md` — especificação + log de decisões (maioria, runoff, quórum por âmbito).
-- `docs/adr/0001…0014` — decisões de arquitetura (ex.: ADR-0002 presença ≠ token;
+- `docs/adr/0001…0015` — decisões de arquitetura (ex.: ADR-0002 presença ≠ token;
   ADR-0006 log de operações restaurável; ADR-0009 motor único; ADR-0012 um .db
   por eleição).
 
 ## Layout
 
-- `main.go` — flags (`-addr -host -data -db -pin -seed -tokens`), bootstrap.
+- `main.go` — invólucro de sinais; o bootstrap (flags `-addr -host -data -db
+  -pin -seed -tokens`) mora em `internal/cli` (`Run`), reaproveitado pelo iOS.
 - `internal/store/` — acesso ao SQLite + lógica de domínio. `schema.sql`
   (embutido), `store.go` (Open/WAL, tokens, CastVote), `electors.go`
   (rol/credenciamento/quórum), `positions.go` (cargos/escrutínios), `tally.go`
@@ -46,6 +47,9 @@ A linguagem segue o GTSI da IPB e é toda em **português**. Não invente termos
   Rotas em `Routes()` (`web.go`). A mesa fica atrás de PIN (`auth`/`authPIN`).
 - `android/` — projeto Gradle **separado** (fora do go.mod): casca fina que
   hospeda o servidor no celular. Ver `android/README.md`.
+- `ios/` — porte da casca para iOS (SwiftUI, Xcode via XcodeGen): o servidor
+  roda no processo do app (`ios/gobridge`, c-archive → `VotacaoGo.xcframework`
+  gerado por `ios/build-go.sh`, não versionado). Ver `ios/README.md`, ADR-0015.
 
 ## Convenções
 
@@ -67,3 +71,5 @@ A linguagem segue o GTSI da IPB e é toda em **português**. Não invente termos
 - O WAL persiste cada voto (recupera após queda). Backup = copiar os 3 arquivos.
 - Android: `-buildmode=pie` é obrigatório; ver README para `termux-elf-cleaner`
   e detecção de IP do hotspot.
+- iOS: nada em `internal/cli` pode chamar `log.Fatal`/`os.Exit` — derrubaria o
+  app hospedeiro. Mudou o Go? Rode `./ios/build-go.sh` antes do `xcodebuild`.

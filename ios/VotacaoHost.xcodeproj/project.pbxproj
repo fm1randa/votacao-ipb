@@ -1,0 +1,584 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		18E79B8FB0189122503F3BA7 /* VotacaoGo.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FECF12BCD5CB4D8983192991 /* VotacaoGo.xcframework */; };
+		1FE12AF74EAE6876C2FC5DEF /* MotorServidor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8DCE631BE9EFDE4660D27AF /* MotorServidor.swift */; };
+		276A871B6CA4597DC6816970 /* ServidorHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF80947466BD34DFA48D19B /* ServidorHostTests.swift */; };
+		301DCFD9A9C5567937A17083 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E16930370B813116707738FD /* Assets.xcassets */; };
+		44FBFFD3831A734E8150E49A /* QR.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BAA08DFAA4E9296AA7D7D91 /* QR.swift */; };
+		B1F9CB4C5B18C7C94C9CA68B /* VotacaoHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB1A51BB583C3AFA56D1B51 /* VotacaoHostApp.swift */; };
+		B4B068CDDAEC853AC5F051CE /* MesaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4058C6E86262D257E310E99D /* MesaView.swift */; };
+		BE9B648B8C63F17710B98441 /* MotorGoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F627AAD267FC790230CFD93 /* MotorGoTests.swift */; };
+		DF33FEFF91530C8B4861A8F2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 980CBE94A5DA7ACB3CE3FC74 /* ContentView.swift */; };
+		E26A1B49106D14C39619418C /* Rede.swift in Sources */ = {isa = PBXBuildFile; fileRef = A598846E799E94137933A630 /* Rede.swift */; };
+		EDD5410A583B344889807F13 /* ServidorHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EDB9484FCB46F880330CB2F /* ServidorHost.swift */; };
+		F7FC5BCBC8B5AB4BD29FC232 /* VotacaoHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DB511065C63EABB968B5484 /* VotacaoHostUITests.swift */; };
+		F834C56E4A2412629B2DAA41 /* RedeQRTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B62F517C833D765DE032E07 /* RedeQRTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		15ADE7897472F6AB302701EB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3A138E0916A0BC985F82EBE9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 007D057C63FCBC539CF904D1;
+			remoteInfo = VotacaoHost;
+		};
+		CDC270EB4E6CCDD4507C9AEE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3A138E0916A0BC985F82EBE9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 007D057C63FCBC539CF904D1;
+			remoteInfo = VotacaoHost;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1E157DCE4B839801F6DC2403 /* VotacaoHost.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VotacaoHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4058C6E86262D257E310E99D /* MesaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesaView.swift; sourceTree = "<group>"; };
+		4EDB9484FCB46F880330CB2F /* ServidorHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServidorHost.swift; sourceTree = "<group>"; };
+		5137F9BC3C593DF247A8B996 /* VotacaoHostTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VotacaoHostTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5BAA08DFAA4E9296AA7D7D91 /* QR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QR.swift; sourceTree = "<group>"; };
+		5FF80947466BD34DFA48D19B /* ServidorHostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServidorHostTests.swift; sourceTree = "<group>"; };
+		7DB511065C63EABB968B5484 /* VotacaoHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VotacaoHostUITests.swift; sourceTree = "<group>"; };
+		7F627AAD267FC790230CFD93 /* MotorGoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorGoTests.swift; sourceTree = "<group>"; };
+		973E3B36381AD448111A7986 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		980CBE94A5DA7ACB3CE3FC74 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9B62F517C833D765DE032E07 /* RedeQRTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedeQRTests.swift; sourceTree = "<group>"; };
+		A598846E799E94137933A630 /* Rede.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rede.swift; sourceTree = "<group>"; };
+		A8DCE631BE9EFDE4660D27AF /* MotorServidor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorServidor.swift; sourceTree = "<group>"; };
+		B555BDC9D926439A94A1678F /* VotacaoHostUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VotacaoHostUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E16930370B813116707738FD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		FEB1A51BB583C3AFA56D1B51 /* VotacaoHostApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VotacaoHostApp.swift; sourceTree = "<group>"; };
+		FECF12BCD5CB4D8983192991 /* VotacaoGo.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = VotacaoGo.xcframework; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		13E12DACD743DE53DFD8D2DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				18E79B8FB0189122503F3BA7 /* VotacaoGo.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		448FDEA1B30783714106CE6F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1E157DCE4B839801F6DC2403 /* VotacaoHost.app */,
+				5137F9BC3C593DF247A8B996 /* VotacaoHostTests.xctest */,
+				B555BDC9D926439A94A1678F /* VotacaoHostUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8D679D99910F0AA157DDD237 = {
+			isa = PBXGroup;
+			children = (
+				9623DDBC072D45043B09E359 /* VotacaoHost */,
+				B39C832BFFB375B8D955E0E2 /* VotacaoHostTests */,
+				93453A683DB9FA3FB6C98B9E /* VotacaoHostUITests */,
+				8EEAE34A90A3E3302F39C5E5 /* Frameworks */,
+				448FDEA1B30783714106CE6F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8EEAE34A90A3E3302F39C5E5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				FECF12BCD5CB4D8983192991 /* VotacaoGo.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		93453A683DB9FA3FB6C98B9E /* VotacaoHostUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7DB511065C63EABB968B5484 /* VotacaoHostUITests.swift */,
+			);
+			path = VotacaoHostUITests;
+			sourceTree = "<group>";
+		};
+		9623DDBC072D45043B09E359 /* VotacaoHost */ = {
+			isa = PBXGroup;
+			children = (
+				E16930370B813116707738FD /* Assets.xcassets */,
+				980CBE94A5DA7ACB3CE3FC74 /* ContentView.swift */,
+				973E3B36381AD448111A7986 /* Info.plist */,
+				4058C6E86262D257E310E99D /* MesaView.swift */,
+				A8DCE631BE9EFDE4660D27AF /* MotorServidor.swift */,
+				5BAA08DFAA4E9296AA7D7D91 /* QR.swift */,
+				A598846E799E94137933A630 /* Rede.swift */,
+				4EDB9484FCB46F880330CB2F /* ServidorHost.swift */,
+				FEB1A51BB583C3AFA56D1B51 /* VotacaoHostApp.swift */,
+			);
+			path = VotacaoHost;
+			sourceTree = "<group>";
+		};
+		B39C832BFFB375B8D955E0E2 /* VotacaoHostTests */ = {
+			isa = PBXGroup;
+			children = (
+				7F627AAD267FC790230CFD93 /* MotorGoTests.swift */,
+				9B62F517C833D765DE032E07 /* RedeQRTests.swift */,
+				5FF80947466BD34DFA48D19B /* ServidorHostTests.swift */,
+			);
+			path = VotacaoHostTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		007D057C63FCBC539CF904D1 /* VotacaoHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 34A34D8072B6A3FE8322A645 /* Build configuration list for PBXNativeTarget "VotacaoHost" */;
+			buildPhases = (
+				0C62667E8E706F8197B357C1 /* Sources */,
+				3090A09E80537E3B7D81CEF0 /* Resources */,
+				13E12DACD743DE53DFD8D2DA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VotacaoHost;
+			packageProductDependencies = (
+			);
+			productName = VotacaoHost;
+			productReference = 1E157DCE4B839801F6DC2403 /* VotacaoHost.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5FA1B256EC88B6318B8A5FB0 /* VotacaoHostTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 354C959946412F842F565DB1 /* Build configuration list for PBXNativeTarget "VotacaoHostTests" */;
+			buildPhases = (
+				30BDC6CDEF0E9E71A4F34263 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				454D2305BDDBBCC1EBD69F66 /* PBXTargetDependency */,
+			);
+			name = VotacaoHostTests;
+			packageProductDependencies = (
+			);
+			productName = VotacaoHostTests;
+			productReference = 5137F9BC3C593DF247A8B996 /* VotacaoHostTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		ED0064D8B933BF64645F66B7 /* VotacaoHostUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AEA145BFC9EB102418521C80 /* Build configuration list for PBXNativeTarget "VotacaoHostUITests" */;
+			buildPhases = (
+				D043D7A5C9FE8ECCEAE8EDCD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CC6E24FFF3A78BC1113AD975 /* PBXTargetDependency */,
+			);
+			name = VotacaoHostUITests;
+			packageProductDependencies = (
+			);
+			productName = VotacaoHostUITests;
+			productReference = B555BDC9D926439A94A1678F /* VotacaoHostUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3A138E0916A0BC985F82EBE9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					007D057C63FCBC539CF904D1 = {
+						ProvisioningStyle = Automatic;
+					};
+					ED0064D8B933BF64645F66B7 = {
+						TestTargetID = 007D057C63FCBC539CF904D1;
+					};
+				};
+			};
+			buildConfigurationList = 1F58E1CA4D9CF90259FA6ED6 /* Build configuration list for PBXProject "VotacaoHost" */;
+			developmentRegion = "pt-BR";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				"pt-BR",
+			);
+			mainGroup = 8D679D99910F0AA157DDD237;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 448FDEA1B30783714106CE6F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				007D057C63FCBC539CF904D1 /* VotacaoHost */,
+				5FA1B256EC88B6318B8A5FB0 /* VotacaoHostTests */,
+				ED0064D8B933BF64645F66B7 /* VotacaoHostUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3090A09E80537E3B7D81CEF0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				301DCFD9A9C5567937A17083 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0C62667E8E706F8197B357C1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF33FEFF91530C8B4861A8F2 /* ContentView.swift in Sources */,
+				B4B068CDDAEC853AC5F051CE /* MesaView.swift in Sources */,
+				1FE12AF74EAE6876C2FC5DEF /* MotorServidor.swift in Sources */,
+				44FBFFD3831A734E8150E49A /* QR.swift in Sources */,
+				E26A1B49106D14C39619418C /* Rede.swift in Sources */,
+				EDD5410A583B344889807F13 /* ServidorHost.swift in Sources */,
+				B1F9CB4C5B18C7C94C9CA68B /* VotacaoHostApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30BDC6CDEF0E9E71A4F34263 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE9B648B8C63F17710B98441 /* MotorGoTests.swift in Sources */,
+				F834C56E4A2412629B2DAA41 /* RedeQRTests.swift in Sources */,
+				276A871B6CA4597DC6816970 /* ServidorHostTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D043D7A5C9FE8ECCEAE8EDCD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7FC5BCBC8B5AB4BD29FC232 /* VotacaoHostUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		454D2305BDDBBCC1EBD69F66 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 007D057C63FCBC539CF904D1 /* VotacaoHost */;
+			targetProxy = CDC270EB4E6CCDD4507C9AEE /* PBXContainerItemProxy */;
+		};
+		CC6E24FFF3A78BC1113AD975 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 007D057C63FCBC539CF904D1 /* VotacaoHost */;
+			targetProxy = 15ADE7897472F6AB302701EB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0B07301567838BD76DBAAF53 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VotacaoHost/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Votação";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "O servidor de votação atende os celulares dos votantes e o telão na rede local.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = "-lresolv";
+				PRODUCT_BUNDLE_IDENTIFIER = app.votacao.host;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		26654E3C76BEA45FB55E827D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.votacao.host.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = VotacaoHost;
+			};
+			name = Release;
+		};
+		663437F565790111AF1ED856 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.votacao.host.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VotacaoHost.app/VotacaoHost";
+			};
+			name = Debug;
+		};
+		83DDE29DC0F16B41FB5AA363 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = "0.0-dev";
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8DFB4A9A7013A039EB5DB11C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VotacaoHost/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Votação";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "O servidor de votação atende os celulares dos votantes e o telão na rede local.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = "-lresolv";
+				PRODUCT_BUNDLE_IDENTIFIER = app.votacao.host;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B3FD162897E97035A2E36567 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.votacao.host.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VotacaoHost.app/VotacaoHost";
+			};
+			name = Release;
+		};
+		E9924D55D0BAF420F0E083D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = "0.0-dev";
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		F8C976A7897CF7331DF03C77 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.votacao.host.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = VotacaoHost;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F58E1CA4D9CF90259FA6ED6 /* Build configuration list for PBXProject "VotacaoHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				83DDE29DC0F16B41FB5AA363 /* Debug */,
+				E9924D55D0BAF420F0E083D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		34A34D8072B6A3FE8322A645 /* Build configuration list for PBXNativeTarget "VotacaoHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B07301567838BD76DBAAF53 /* Debug */,
+				8DFB4A9A7013A039EB5DB11C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		354C959946412F842F565DB1 /* Build configuration list for PBXNativeTarget "VotacaoHostTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				663437F565790111AF1ED856 /* Debug */,
+				B3FD162897E97035A2E36567 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AEA145BFC9EB102418521C80 /* Build configuration list for PBXNativeTarget "VotacaoHostUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F8C976A7897CF7331DF03C77 /* Debug */,
+				26654E3C76BEA45FB55E827D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3A138E0916A0BC985F82EBE9 /* Project object */;
+}
