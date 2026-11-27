@@ -1,0 +1,69 @@
+{{define "rede.html"}}<!doctype html><html lang="pt-br"><head><title>Rede — Mesa</title>{{template "styles"}}{{template "htmxjs"}}</head>
+<body>
+<div class="shell">
+  {{template "mesanav" .}}
+  <main class="content"><div class="wrap has-bottomnav">
+    <p class="eyebrow">Configuração</p>
+    <h1>Rede e acesso</h1>
+    <p class="mut">Os celulares precisam estar na mesma rede Wi-Fi que esta máquina. Não precisa de internet.</p>
+
+    <div hx-get="/board/rede/estado" hx-trigger="every 3s" hx-swap="innerHTML">
+      {{template "redeEstado" .}}
+    </div>
+
+    <details class="card">
+      <summary class="mut">Endereços desta máquina</summary>
+      <ul class="mut">{{range .IPs}}<li><code>{{.Nome}}</code>: {{.IP}}</li>{{else}}<li>nenhum</li>{{end}}</ul>
+    </details>
+
+    <a class="ghost btn" href="/board/ajustes">Voltar</a>
+  </div></main>
+</div>
+{{template "mesabottom" .}}
+{{template "mesatoast" .}}
+</body></html>{{end}}
+
+{{define "redeEstado"}}
+{{if .Mac}}
+  {{if .Hotspot.Ligado}}
+    <div class="card">
+      <h2>Hotspot do Mac <span class="pill on">ligado</span></h2>
+      {{if .Hotspot.Rede}}<p>Peça aos celulares para entrar na rede <strong>{{.Hotspot.Rede}}</strong> e ler o QR abaixo.</p>{{end}}
+    </div>
+  {{else}}
+    <div class="card">
+      <h2>Hotspot do Mac <span class="pill off">desligado</span></h2>
+      {{if and .Hotspot.NAT (not .Hotspot.WiFi)}}
+        <p><span class="pill warn">atenção</span> O Compartilhamento de Internet está ligado, mas sem o Wi-Fi marcado. Os celulares não conseguem entrar.</p>
+      {{else}}
+        <p class="mut">Sem roteador por perto, o próprio Mac pode criar a rede Wi-Fi. Faça uma vez:</p>
+      {{end}}
+      <ol style="line-height:1.6; padding-left:1.2em">
+        <li>Use o botão <strong>Abrir Compartilhamento no Mac</strong> abaixo: ele abre os Ajustes do Sistema no Mac do servidor.</li>
+        <li>Clique no <strong>ⓘ</strong> ao lado de <strong>Compartilhamento de Internet</strong>.</li>
+        <li>Em <strong>Compartilhar conexão de</strong>, escolha <strong>Ponte Thunderbolt</strong> (ou qualquer opção que não seja Wi-Fi). Não precisa ter internet.</li>
+        <li>Em <strong>Com computadores que usam</strong>, marque <strong>Wi-Fi</strong>. Em <strong>Opções de Wi-Fi</strong>, defina o nome da rede e uma senha.</li>
+        <li>Clique em OK e ligue o <strong>Compartilhamento de Internet</strong>. Esta tela atualiza sozinha.</li>
+      </ol>
+      <form hx-post="/board/rede/abrir-ajustes" hx-swap="none">
+        <button type="submit">Abrir Compartilhamento no Mac</button>
+      </form>
+      <p class="mut" style="margin-top:10px">Enquanto o hotspot estiver ligado, o Wi-Fi do Mac sai da rede atual. Ele aguenta poucos aparelhos (em torno de 10 a 15); para assembleias grandes, prefira um roteador.</p>
+    </div>
+  {{end}}
+{{end}}
+
+<div class="card" style="text-align:center">
+  <h2>Endereço de acesso</h2>
+  <p style="font-size:1.3rem; font-weight:700; word-break:break-all">{{.URL}}</p>
+  <img src="/qr.png?ip={{.URL}}" alt="QR code de acesso" style="width:220px; height:220px; max-width:100%">
+  {{if .Override}}
+    <p class="mut">Endereço fixado na inicialização (<code>-host={{.Override}}</code>).
+    {{if and .Hotspot.Ligado (ne .Override .Hotspot.IP)}}<br><span class="pill warn">atenção</span> O hotspot do Mac está em <strong>{{.Hotspot.IP}}</strong>. Reinicie sem <code>-host</code> para os celulares do hotspot acharem o servidor.{{end}}</p>
+  {{end}}
+  {{if not .Mac}}
+    <p class="mut">Sem roteador, ligue o roteador (hotspot) de um celular e conecte esta máquina e os votantes nele. No Android, o app votacao-ipb pode ser o próprio servidor.</p>
+  {{end}}
+</div>
+
+{{end}}

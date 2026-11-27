@@ -8,6 +8,9 @@ import (
 )
 
 // LanIP descobre o IP desta máquina na LAN, na ordem:
+//  0. hotspot do macOS (Compartilhamento de Internet) ligado → IP da bridge
+//     dele; vem antes porque o dial UDP e a enumeração podem achar outra
+//     interface (cabo, bridge de VM) que os celulares do hotspot não usam;
 //  1. dial UDP (resolve a rota de saída — cobre rede normal com roteador);
 //  2. enumeração de interfaces (fallbackLanIP; cobre hotspot Android, onde não
 //     há rota externa — ver lanip_linux.go);
@@ -15,6 +18,9 @@ import (
 //
 // O override manual (-host) é tratado antes, em Server.baseURL e no main.
 func LanIP() string {
+	if ip := hotspotIP(); ip != "" {
+		return ip
+	}
 	if ip := udpLanIP(); ip != "" {
 		return ip
 	}

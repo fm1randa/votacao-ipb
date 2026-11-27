@@ -99,7 +99,7 @@ func main() {
 		log.Printf("votação %s no ar em http://%s%s", web.Version, announce, *addr)
 		log.Printf("  eleitores: abra esse endereço no celular (mesma rede WiFi)")
 		if announce == "localhost" {
-			log.Printf("  AVISO: IP da rede não detectado — rode com -host=<IP> (ex. hotspot)")
+			log.Printf("  AVISO: IP da rede não detectado — rode com -host=<IP> (ex. hotspot) ou veja /board/rede")
 		}
 		if pinDefinido == "" {
 			log.Printf("  mesa:      http://%s%s/board   (defina o PIN da mesa na 1ª vez)", announce, *addr)
